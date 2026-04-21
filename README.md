@@ -1,5 +1,7 @@
 # PocketFlow-Minimalist-LLM-Agent-Framework-
 
+<img width="2558" height="859" alt="image" src="https://github.com/user-attachments/assets/acdf2eda-cb69-4206-9d31-c3efe2a94da9" />
+
 PocketFlow is a lightweight, high-performance orchestration framework designed for building complex AI agents and LLM workflows. In an era of bloated AI libraries, PocketFlow stands out by implementing its entire core in roughly 100 lines of code. It treats AI systems as a Nested Directed Graph, where nodes represent tasks (e.g., calling an LLM, searching the web) and flows handle the routing and shared state.
 
 The project follows a "No-Magic" philosophy—eliminating vendor lock-in and heavy abstractions. Developers can easily build advanced patterns such as:
