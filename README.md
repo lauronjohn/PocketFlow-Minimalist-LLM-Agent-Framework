@@ -272,12 +272,12 @@ The table below summarises all external systems that interact with PocketFlow, t
 ## 10. Weekly Progress Log
 
 ### Week 1
-- [ ] 
-- [ ] 
+- [ Table of Contents ] 
+- [ Introduction ] 
 
 ### Week 2
-- [ ] 
-- [ ] 
+- [ Stakeholder Analysis ] 
+- [ Context View ] 
 
 ### Week 3
 - [ ] 
