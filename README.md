@@ -229,66 +229,21 @@ The table below summarises all external systems that interact with PocketFlow, t
 
 > _To be completed — Week 6_
 
-| Field | Description |
-|---|---|
-| **Source** | |
-| **Stimulus** | |
-| **Artifact** | |
-| **Environment** | |
-| **Response** | |
-| **Measure** | |
-
 ### 7.2 Performance
 
 > _To be completed — Week 6_
-
-| Field | Description |
-|---|---|
-| **Source** | |
-| **Stimulus** | |
-| **Artifact** | |
-| **Environment** | |
-| **Response** | |
-| **Measure** | |
 
 ### 7.3 Portability
 
 > _To be completed — Week 6_
 
-| Field | Description |
-|---|---|
-| **Source** | |
-| **Stimulus** | |
-| **Artifact** | |
-| **Environment** | |
-| **Response** | |
-| **Measure** | |
-
 ### 7.4 Testability
 
 > _To be completed — Week 6_
 
-| Field | Description |
-|---|---|
-| **Source** | |
-| **Stimulus** | |
-| **Artifact** | |
-| **Environment** | |
-| **Response** | |
-| **Measure** | |
-
 ### 7.5 Extensibility
 
 > _To be completed — Week 6_
-
-| Field | Description |
-|---|---|
-| **Source** | |
-| **Stimulus** | |
-| **Artifact** | |
-| **Environment** | |
-| **Response** | |
-| **Measure** | |
 
 ---
 
