@@ -74,7 +74,7 @@ The document is organized around the 4+1 view model: a stakeholder and context v
 
 ### 2.1 Stakeholder Identification
 
-Stakeholders were identified through analysis of the GitHub repository (contributors list, issues, pull requests), the official documentation, and the DeepWiki analysis of PocketFlow's philosophy and positioning.
+Stakeholders were identified through analysis of the GitHub repository (contributors list, issues, pull requests) and the official documentation of PocketFlow.
 
 | Stakeholder | Type | Role | Key Concerns |
 |---|---|---|---|
