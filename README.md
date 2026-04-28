@@ -253,10 +253,6 @@ The table below summarises all external systems that interact with PocketFlow, t
 
 > _To be completed — Week 7_
 
-| Omitted Capability | Why Omitted | Consequence |
-|---|---|---|
-| | | |
-
 ### 8.2 Identified Structural Risks
 
 > _To be completed — Week 7_
@@ -264,10 +260,6 @@ The table below summarises all external systems that interact with PocketFlow, t
 ### 8.3 Comparison to Competitors
 
 > _To be completed — Week 7_
-
-| Quality Attribute | PocketFlow | LangChain |
-|---|---|---|
-| | | |
 
 ---
 
