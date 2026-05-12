@@ -117,55 +117,66 @@ Each of PocketFlow's most significant architectural decisions can be traced back
 
 ## 3. Context View
 
-### 3.1 System Scope
+### PocketFlow System Scope and Responsibilities
 
-The context view defines the boundaries of PocketFlow as a system — what it is responsible for, what surrounds it, and how it interacts with the external world. PocketFlow's boundary is unusually narrow by design: the system is responsible only for **graph-based orchestration of LLM tasks**. Everything else — calling LLMs, accessing databases, searching the web, managing storage — is deliberately placed outside the boundary in user space.
+#### 3.1 System Scope
+
+**PocketFlow** is a lightweight workflow and orchestration core for building LLM applications.
+
+Its scope is to provide the minimal abstractions needed to structure application logic as **nodes** and **flows**, while leaving integrations with LLMs, tools, storage, and external services to user-defined code.
+
+PocketFlow sits between the developer’s application code and external systems such as **LLM providers**, **tool APIs**, and **vector databases**.
+
+#### Responsibilities
+
+PocketFlow is responsible for:
+
+- Providing core workflow abstractions such as `Node`, `Flow`, `BatchNode`, and async flow variants.
+- Defining how steps in an LLM application are connected and executed.
+- Supporting reusable graph-like workflows for:
+  - agents
+  - RAG pipelines
+  - batch jobs
+  - workflows
+  - MapReduce-style applications
+- Managing shared state between workflow steps through a simple shared store.
+- Allowing developers to subclass and compose nodes and flows to build custom application behavior.
+- Keeping the core lightweight and dependency-minimal, relying only on the Python standard library.
+- Providing a stable abstraction that can be reused by cookbook examples, language ports, and ecosystem tooling.
+
+#### Outside the System Scope
+
+PocketFlow is not responsible for:
+
+- Hosting or providing LLM models.
+- Implementing provider-specific APIs for OpenAI, Claude, Gemini, Ollama, or DeepSeek.
+- Owning external tools such as web search, file systems, REST APIs, MCP servers, or text-to-speech services.
+- Managing vector databases such as ChromaDB, FAISS, or Pinecone.
+- Providing authentication, billing, monitoring, deployment, or production infrastructure.
+- Storing long-term application data beyond the workflow’s shared runtime state.
+- Deciding application-specific prompts, business rules, retrieval logic, or tool behavior.
 
 The diagram below illustrates the full context of PocketFlow, showing the system at the centre surrounded by the external actors and systems it interacts with.
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/94cba42d-d4ba-4dd7-a311-e1ff1d00bc8d" />
-
-
-**Figure 1 — PocketFlow Context View.** The teal box is the system boundary (100-line core). All LLM provider integrations, tool APIs, and vector databases live outside the boundary in user-implemented utility functions. Downstream consumers (LLM app developers, cookbook examples, and language port maintainers) interact with PocketFlow from below, while external services are accessed by user code from above.
+<img width="1586" height="992" alt="image" src="https://github.com/user-attachments/assets/2fcc8d19-69a1-4853-8c1a-f8740c963a22" />
 
 ### 3.2 Context Diagram Description
 
-The context diagram reveals four distinct categories of external interaction:
+This PocketFlow Context View shows PocketFlow as the central system and the external people, tools, platforms, and dependencies around it. PocketFlow Core is the main system in the center. It provides a minimal workflow/orchestration layer for building LLM applications using nodes and flows.
 
-**① Upstream: LLM Providers and Tool APIs**
+- **LLM App Developers** are the primary users. They build applications by subclassing PocketFlow’s Node and Flow abstractions.
 
-PocketFlow interacts with LLM providers and external tools only indirectly — through user-implemented utility functions such as `call_llm()` and `search_web()`. The framework itself makes no network calls and imports no vendor SDKs. Supported LLM providers demonstrated in the cookbook include OpenAI (GPT-4o), Anthropic Claude, Google Gemini, Ollama for local models, and DeepSeek. External tools include web search APIs, file systems, REST services, Model Context Protocol (MCP) servers, and text-to-speech services. This indirect relationship is a defining architectural choice: it is the mechanism by which PocketFlow achieves zero vendor lock-in.
+- **User Space** represents the developer’s own application code. This is where custom utility functions such as call_llm() and tool wrappers are implemented.
 
-**② Downstream: LLM Application Developers**
+- **LLM Providers** are external model services such as OpenAI, Claude, Gemini, Ollama, and DeepSeek. PocketFlow reaches them through user-defined LLM call functions.
 
-LLM application developers consume PocketFlow either via `pip install pocketflow` from PyPI or by directly copying the 100-line source file. They subclass `Node` and `Flow` to build their own agents, workflows, and RAG pipelines. The framework imposes no constraints on what tools or LLMs they use — these are all resolved at the user level.
+- **External Tool APIs** are services or systems used by PocketFlow apps, such as web search, file systems, REST APIs, MCP servers, and text-to-speech tools.
 
-**③ Downstream: Cookbook Examples**
+- **Vector Databases** support embedding search and retrieval workflows, commonly used in RAG applications. Examples include ChromaDB, FAISS, and Pinecone.
 
-The 26+ cookbook applications in the repository serve a dual role: they are both documentation and proof-of-concept. Each cookbook example is a self-contained Python project that demonstrates one design pattern (Agent, Workflow, RAG, MapReduce, etc.) by combining PocketFlow's core classes with user-defined utility functions. They sit outside the system boundary because they are not part of the framework itself — they are consumers of it.
+- **Python Standard Library** is shown as the only true dependency, meaning PocketFlow is designed to stay lightweight and avoid requiring heavy external packages.
 
-**④ Downstream: Language Port Ecosystem**
-
-Six community-maintained ports (TypeScript, Java, C++, Go, Rust, PHP) reproduce the identical Graph + Shared Store abstraction in other language ecosystems. These ports are separate repositories under the `The-Pocket` GitHub organisation and are architecturally significant because their existence validates the language-independence of PocketFlow's core design.
-
-### 3.3 External Dependencies
-
-The table below summarises all external systems that interact with PocketFlow, their location relative to the system boundary, and their relationship type.
-
-| External System | Location | Relationship | Examples |
-|---|---|---|---|
-| **LLM Provider APIs** | User utility functions (`utils/call_llm.py`) | Called by user code inside `Node.exec()`; no direct framework dependency | OpenAI, Anthropic, Gemini, Ollama, DeepSeek |
-| **Vector Databases** | Cookbook examples | Used by RAG pattern implementations; not referenced by core | ChromaDB, FAISS, Pinecone |
-| **External Tool APIs** | Cookbook examples and user utility functions | Called by Agent nodes as tool actions | DuckDuckGo Search, file systems, REST APIs |
-| **MCP Servers** | Cookbook examples (`pocketflow-mcp`) | Accessed via the Model Context Protocol for standardised tool use | Numerical operations, custom MCP-compliant services |
-| **PyPI** | Distribution | PocketFlow is published as a pip-installable package | `pip install pocketflow` |
-| **GitHub** | Development infrastructure | Hosts source code, issues, pull requests, contributor discussions | github.com/The-Pocket/PocketFlow |
-| **MkDocs / GitHub Pages** | Documentation infrastructure | Renders the official documentation site | the-pocket.github.io/PocketFlow |
-| **Discord** | Community infrastructure | Hosts developer community for support and feedback | discord.gg/hUHHE9Sa6T |
-| **Language Port Repositories** | Sibling repositories | Independently maintained ports of the core abstraction | PocketFlow-Typescript, PocketFlow-Java, PocketFlow-Go, etc. |
-| **Python Standard Library** | Core package imports | The only imports used by `pocketflow/__init__.py` itself | `typing`, `abc`, `asyncio`, `copy` |
-
----
+- **Cookbook Examples**, **Language Ports**, and **Dev Infrastructure** represent the surrounding ecosystem: sample apps, implementations in other languages, and project support tools such as GitHub, PyPI, MkDocs, and Discord.
 
 ## 4. Development View
 
