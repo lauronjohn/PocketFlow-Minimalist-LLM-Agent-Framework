@@ -455,8 +455,8 @@ graph TD
 - [ Context View ] 
 
 ### Week 3
-- [ ] 
-- [ ] 
+- [ Architecture Design Decisions ] 
+- [ Design Decision Relationship Graph ] 
 
 ### Week 4
 - [ ] 
