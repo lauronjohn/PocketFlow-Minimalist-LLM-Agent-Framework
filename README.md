@@ -223,118 +223,118 @@ This section documents PocketFlow's key architecture design decisions using the 
 
 | ID | Decision | Primary quality drivers |
 |---|---|---|
-| ADD-01 | Model LLM applications as a Graph + Shared Store | Modifiability, simplicity, expressiveness |
-| ADD-02 | Represent computation as Nodes with a `prep -> exec -> post` lifecycle | Separation of concerns, testability, reliability |
-| ADD-03 | Use Action-labeled Flow transitions for sequencing, branching, looping, and nesting | Extensibility, composability, understandability |
-| ADD-04 | Keep LLM providers, vector databases, tools, and other utilities outside the core | Portability, maintainability, vendor independence |
-| ADD-05 | Maintain a 100-line, zero-dependency Python core | Auditability, portability, deployability |
-| ADD-06 | Provide batch, async, and parallel behavior as minimal core variants | Performance, scalability, expressiveness |
-| ADD-07 | Treat examples, cookbook projects, and agentic-coding guidance as the main extension mechanism | Learnability, ecosystem growth, controlled core scope |
+| ADD-01 | Keep core implementation to exactly 100 lines with zero dependencies | Maintainability, learning curve, flexibility |
+| ADD-02 | Model workflows as Graph + Shared Store | Modifiability, simplicity, expressiveness |
+| ADD-03 | Do not provide built-in utilities; instead provide examples | Portability, maintainability, vendor independence |
+| ADD-04 | Three-phase lifecycle: Prep, Exec, Post | Separation of concerns, testability, reliability |
+| ADD-05 | Nodes return string "actions" as routing keys | Extensibility, composability, understandability |
+| ADD-06 | Humans design high-level flows; AI agents implement nodes | Learnability, ecosystem growth, controlled core scope |
+| ADD-07 | Use a shared dictionary as a data contract | Modifiability, loose coupling, state management |
 
-### 6.2 ADD-01: Model LLM Applications as a Graph + Shared Store
-
-| Template Item | Description |
-|---|---|
-| Issue | What is the irreducible core abstraction for building LLM workflows, agents, RAG pipelines, and multi-step applications? |
-| Importance | Very high. This decision defines the system's conceptual model and all later implementation choices. |
-| Decision | PocketFlow models an LLM application as a directed graph of Nodes connected by Flows, with communication through a Shared Store. |
-| Status | Accepted. This is the central abstraction described in the official documentation and implemented in `pocketflow/__init__.py`. |
-| Group | Core abstraction. |
-| Assumptions | LLM applications can be decomposed into discrete steps; graph composition is expressive enough for workflows, agents, RAG, MapReduce, and multi-agent systems; a shared dictionary is sufficient as the default communication mechanism. |
-| Alternatives | Linear chains; monolithic agent loop; full-featured workflow engine; actor model; strongly typed DAG with explicit data ports. |
-| Arguments | A graph supports sequencing, branching, looping, and recursion while remaining small. A shared store avoids heavy interface machinery and keeps node signatures stable. The same abstraction also appears in community ports, suggesting language-independent structure. |
-| Implications | Most application logic is written as custom nodes and connected through flows. Developers must design the shared data schema themselves. |
-| Possible negative impact on quality | Modifiability can suffer if the shared store becomes an implicit global object. Testability and reliability depend on disciplined key naming and schema documentation. |
-
-### 6.3 ADD-02: Represent Computation as Nodes with `prep -> exec -> post`
+### 6.2 ADD-01: Minimalist Core Framework
 
 | Template Item | Description |
 |---|---|
-| Issue | How should a single workflow step separate data access, computation, state update, and transition selection? |
-| Importance | High. Node behavior is the framework's smallest reusable unit. |
-| Decision | Each Node follows a three-step lifecycle: `prep(shared)` reads and prepares data, `exec(prep_res)` performs computation, and `post(shared, prep_res, exec_res)` writes results and returns the next Action. |
-| Status | Accepted. This lifecycle is documented as the Node contract. |
-| Group | Core execution model. |
-| Assumptions | Separating data movement from computation improves clarity; most LLM calls and tool calls can be isolated inside `exec`; retries are safer when `exec` is idempotent. |
-| Alternatives | A single `run()` method; event-handler callbacks; middleware pipeline; explicit input/output port objects. |
-| Arguments | The lifecycle keeps shared-state access out of the compute step and gives a natural place for retry and fallback handling. It also makes individual nodes easier to test. |
-| Implications | Node authors must understand which responsibilities belong in each method. Retry logic is concentrated around `exec`, while state mutation is concentrated in `post`. |
-| Possible negative impact on quality | Simple nodes may feel verbose. If developers ignore the intended separation, hidden side effects can reduce reliability and testability. |
+| Issue | What should be the size and scope of the core framework? |
+| Importance | High - affects maintainability, learning curve, and flexibility |
+| Decision | Keep core implementation to exactly 100 lines with zero dependencies |
+| Status | Accepted |
+| Group | Core Architecture |
+| Assumptions | Complex patterns can be built from simple primitives; developers prefer flexibility over convenience |
+| Alternatives | Full-featured frameworks like LangChain (405K lines), CrewAI (18K lines) |
+| Arguments | Reduces bloat, easier to understand, eliminates vendor lock-in, forces developers to understand fundamentals |
+| Implications | Users must implement their own utility functions; steeper initial learning curve |
+| Possible negative impact on quality | More initial setup work compared to batteries-included frameworks |
 
-### 6.4 ADD-03: Use Action-Labeled Flow Transitions
-
-| Template Item | Description |
-|---|---|
-| Issue | How should PocketFlow express control flow without adding a large orchestration language? |
-| Importance | High. This decision determines whether the framework can support both simple chains and agentic branching. |
-| Decision | A Node's `post()` returns an Action string. Flow transitions map Actions to successor nodes using concise operators such as `node_a >> node_b` and `node_a - "approved" >> node_b`. |
-| Status | Accepted. This mechanism is documented for default transitions, named transitions, branching, loops, and nested flows. |
-| Group | Flow orchestration. |
-| Assumptions | String-labeled edges are understandable to Python developers; most workflows can choose the next step from a small set of labels; ending a flow when no successor matches is acceptable. |
-| Alternatives | Declarative YAML workflow definitions; explicit transition tables; state-machine library; hardcoded `if/else` orchestration in application code. |
-| Arguments | Action-labeled edges keep orchestration close to Python code while still making the graph structure visible. The same mechanism supports workflow, agent, and approval-loop patterns. |
-| Implications | Flow logic is lightweight and composable. A Flow can also act like a Node, enabling nested flows and reuse. |
-| Possible negative impact on quality | String Actions are not type-checked. Misspelled labels may only appear at runtime, and complex graphs can become difficult to inspect without visualization. |
-
-### 6.5 ADD-04: Exclude Provider and Utility Wrappers from the Core
+### 6.3 ADD-02: Graph + Shared Store Abstraction
 
 | Template Item | Description |
 |---|---|
-| Issue | Should the framework include built-in wrappers for LLM providers, vector databases, search APIs, text-to-speech, and other tools? |
-| Importance | Very high. This is PocketFlow's main boundary decision and its clearest contrast with larger LLM frameworks. |
-| Decision | PocketFlow does not provide built-in utilities. Developers implement their own functions, such as `call_llm()`, and connect them through Nodes. |
-| Status | Accepted. The official documentation explicitly says utilities are examples rather than framework features. |
-| Group | System boundary and dependency policy. |
-| Assumptions | Provider APIs change frequently; users need flexibility to switch vendors, use fine-tuned models, or run local models; a general framework should not own app-specific integration code. |
-| Alternatives | Include first-party wrappers for OpenAI, Anthropic, Gemini, vector databases, web search, and common tools; provide plugin packages; adopt optional extras. |
-| Arguments | Exclusion reduces maintenance burden, dependency conflicts, and vendor lock-in. It also keeps the core abstraction stable while LLM APIs evolve. |
-| Implications | The framework remains small and vendor-neutral. Application repositories carry more integration responsibility. |
-| Possible negative impact on quality | Usability and time-to-first-app can suffer because beginners must write or copy utility functions. Different projects may duplicate wrapper code and error handling. |
+| Issue | What should be the fundamental abstraction for LLM workflows? |
+| Importance | High - this is the core conceptual model that everything else builds upon |
+| Decision | Model workflows as Graph (nodes connected by labeled edges called Actions) + Shared Store (central state management) |
+| Status | Accepted |
+| Group | Core Architecture |
+| Assumptions | Most LLM workflows can be modeled as directed graphs with shared state; state management is a cross-cutting concern |
+| Alternatives | Chain-based (linear sequences only), Agent-based only, Pipeline-based |
+| Arguments | More flexible than chains, simpler than full agent systems, enables complex patterns like loops and branching |
+| Implications | All workflows must be expressible as graphs; state management is explicit rather than implicit |
+| Possible negative impact on quality | May be limiting for workflows that don't fit graph model well |
 
-### 6.6 ADD-05: Maintain a 100-Line, Zero-Dependency Core
-
-| Template Item | Description |
-|---|---|
-| Issue | How much implementation should belong in the core package? |
-| Importance | Very high. The 100-line constraint is both a technical decision and a product identity. |
-| Decision | Keep the Python core in approximately 100 lines with no external runtime dependencies beyond the standard library. |
-| Status | Accepted. The GitHub README, docs, and package description all foreground the 100-line, zero-dependency property. |
-| Group | Implementation structure and release policy. |
-| Assumptions | Minimal code is easier to audit, port, copy, and reason about; advanced capabilities can be expressed by composing the small core rather than expanding it. |
-| Alternatives | Larger batteries-included framework; modular package with optional dependencies; plugin system inside the core; separate packages for integrations. |
-| Arguments | Small size improves transparency, portability, and agentic-coding friendliness. It also reduces supply-chain risk and installation friction. |
-| Implications | Every new feature faces a high inclusion bar. Documentation and examples must carry much of the educational load. |
-| Possible negative impact on quality | Observability, validation, schema management, debugging support, and production operations are limited unless users add them externally. |
-
-### 6.7 ADD-06: Provide Batch, Async, and Parallel Variants
+### 6.4 ADD-03: No Built-in Utility Functions
 
 | Template Item | Description |
 |---|---|
-| Issue | How can the framework support data-intensive and I/O-bound LLM applications while staying minimal? |
-| Importance | Medium to high. Many LLM systems need to process collections, wait for remote APIs, or overlap independent calls. |
-| Decision | Provide small variants such as `BatchNode`, `BatchFlow`, `AsyncNode`, `AsyncFlow`, `AsyncBatchNode`, `AsyncParallelBatchNode`, and parallel batch flows. |
-| Status | Accepted. These variants are part of the 100-line implementation and official core documentation. |
-| Group | Execution scalability. |
-| Assumptions | Batch and async behavior can be modeled as specialized forms of the same Node/Flow lifecycle; I/O-bound work benefits from async concurrency; CPU-bound parallelism is outside the core. |
-| Alternatives | Leave batching and async entirely to application code; integrate a task queue; use multiprocessing; depend on a full workflow scheduler. |
-| Arguments | These variants preserve the core abstraction while covering common LLM use cases such as chunk processing, MapReduce, async API calls, and parallel requests. |
-| Implications | Developers can scale common patterns without learning a second framework. Parallel behavior remains intentionally lightweight and cooperative. |
-| Possible negative impact on quality | Parallel calls can trigger provider rate limits. Shared-store mutation during concurrent work can create ordering or consistency risks if tasks are not independent. |
+| Issue | Should the framework include built-in utility functions for common tasks (LLM calls, embeddings, etc.)? |
+| Importance | High - affects developer experience and framework flexibility |
+| Decision | Do not provide built-in utilities; instead provide examples and let users implement their own |
+| Status | Accepted |
+| Group | Framework Philosophy |
+| Assumptions | Vendor APIs change frequently; developers need flexibility to switch providers; optimizations are easier without lock-in |
+| Alternatives | Include comprehensive utility library like LangChain, include basic utilities with extension points |
+| Arguments | Avoids vendor lock-in, reduces maintenance burden, allows optimizations like prompt caching and streaming, enables switching between providers |
+| Implications | Developers must implement their own utilities; more initial setup but long-term flexibility |
+| Possible negative impact on quality | Higher barrier to entry; more boilerplate code for simple applications |
 
-### 6.8 ADD-07: Use Cookbook Examples and Agentic-Coding Guidance as the Extension Mechanism
+### 6.5 ADD-04: Node Lifecycle Pattern (Prep-Exec-Post)
 
 | Template Item | Description |
 |---|---|
-| Issue | How should PocketFlow teach and distribute higher-level capabilities without expanding the core? |
-| Importance | Medium. The project depends on examples to show that the small abstraction is expressive enough. |
-| Decision | Keep higher-level patterns, integrations, and application templates in documentation, cookbook examples, and agentic-coding guidance rather than adding them as core APIs. |
-| Status | Accepted. The official README lists many tutorials and complex application examples, while the core remains minimal. |
-| Group | Documentation and ecosystem architecture. |
-| Assumptions | Developers and AI coding agents can adapt examples into their own projects; examples are easier to change than core APIs; cookbook breadth compensates for the small core. |
-| Alternatives | Add first-class modules for agents, RAG, MapReduce, tools, memory, and observability; create a plugin marketplace; maintain separate official extension packages. |
-| Arguments | Examples preserve minimalism while proving expressiveness. They also support education and agentic coding, where a human designs the flow and AI helps generate code. |
-| Implications | The architectural center of gravity is the stable core plus evolving examples. Pattern knowledge lives mostly outside the runtime package. |
-| Possible negative impact on quality | Example-driven reuse can lead to inconsistent production implementations. Important behavior may be copied rather than shared, increasing maintenance effort across applications. |
+| Issue | How should individual nodes structure their execution logic? |
+| Importance | High - defines the fundamental unit of work pattern |
+| Decision | Three-phase lifecycle: Prep (read/serialize from shared), Exec (perform computation isolated from shared), Post (write results to shared and return action) |
+| Status | Accepted |
+| Group | Node Architecture |
+| Assumptions | Separation of concerns improves testability and retry logic; isolation enables portability |
+| Alternatives | Single execute method with direct shared access, event-driven pattern, functional composition |
+| Arguments | Enables safe retries (exec is idempotent), clear separation of data flow, easier testing, supports async operations |
+| Implications | All nodes must follow this pattern; some boilerplate required for simple operations |
+| Possible negative impact on quality | May feel verbose for simple operations; learning curve for the pattern |
+
+### 6.6 ADD-05: Action-Based Routing
+
+| Template Item | Description |
+|---|---|
+| Issue | How should nodes connect and determine execution flow? |
+| Importance | High - enables dynamic workflows and conditional branching |
+| Decision | Nodes return string "actions" that serve as routing keys to determine successor nodes |
+| Status | Accepted |
+| Group | Flow Control |
+| Assumptions | String-based routing is sufficient for most workflows; conditional logic belongs in nodes not in flow definition |
+| Alternatives | Hard-coded successor chains, boolean conditions, complex routing DSL |
+| Arguments | Enables dynamic decision-making, supports loops and branching, simple to implement and understand |
+| Implications | Flow control is decentralized to individual nodes; action naming becomes important |
+| Possible negative impact on quality | Action naming conventions must be consistent; debugging flow paths may be complex |
+
+### 6.7 ADD-06: Agentic Coding Methodology
+
+| Template Item | Description |
+|---|---|
+| Issue | How should humans and AI agents collaborate in building LLM applications? |
+| Importance | Medium - affects development process and team workflow |
+| Decision | Humans design high-level flows and data schemas; AI agents implement specific nodes and utility functions |
+| Status | Accepted |
+| Group | Development Process |
+| Assumptions | Humans are better at system design; AI is better at implementation details; iterative refinement is necessary |
+| Alternatives | Fully human-driven development, fully AI-driven development, pair programming approach |
+| Arguments | Leverages strengths of both humans and AI, enables rapid iteration, reduces human implementation burden |
+| Implications | Requires clear design documentation; humans must understand framework well enough to design effectively |
+| Possible negative impact on quality | Dependency on AI quality; may not work for all team structures |
+
+### 6.8 ADD-07: Shared Store as Data Contract
+
+| Template Item | Description |
+|---|---|
+| Issue | How should nodes communicate and share state? |
+| Importance | High - fundamental to the architecture's data flow |
+| Decision | Use a shared dictionary (shared store) as a data contract that all nodes agree upon for retrieving and storing data |
+| Status | Accepted |
+| Group | State Management |
+| Assumptions | Dictionary-based state is sufficient for most use cases; explicit data contracts improve maintainability |
+| Alternatives | Message passing, function parameters, event bus, database-backed state |
+| Arguments | Simple and flexible; enables loose coupling between nodes; supports both in-memory and persistent implementations |
+| Implications | Data schema design becomes critical; potential for data inconsistency if contract not followed |
+| Possible negative impact on quality | No compile-time checking of data contracts; runtime errors possible |
 
 ### 6.9 Relationships Between Architecture Design Decisions
 
@@ -342,39 +342,51 @@ The decisions form a graph rather than a flat list. In the course terminology, i
 
 | Relationship | Explanation |
 |---|---|
-| ADD-05 constrains ADD-01 to ADD-07 | The 100-line, zero-dependency constraint limits how elaborate the graph model, lifecycle, utilities, execution variants, and documentation strategy can become. |
-| ADD-01 enables ADD-02 and ADD-03 | Once the system is modeled as Graph + Shared Store, Nodes become the units of graph behavior and Flows become the control structure between them. |
-| ADD-02 enables ADD-06 | The stable lifecycle makes it possible to define batch and async variants by changing execution behavior while preserving the same conceptual contract. |
-| ADD-03 enables ADD-07 | Action-labeled transitions make cookbook patterns such as agents, workflows, RAG, and MapReduce easy to express as examples. |
-| ADD-04 reinforces ADD-05 | Excluding provider and utility wrappers is necessary to keep the core small and dependency-free. |
-| ADD-04 conflicts with usability | Vendor independence and low maintenance are gained at the cost of more setup work for first-time users. |
-| ADD-06 conflicts with simplicity | Batch, async, and parallel variants increase expressiveness and performance but add more classes and concurrency concerns. |
-| ADD-07 compensates for ADD-04 and ADD-05 | Because the core excludes many conveniences, examples and agentic-coding guidance become the main way to transfer practical implementation knowledge. |
+| ADD-01 constrains ADD-02 to ADD-07 | The 100-line, zero-dependency constraint limits how elaborate the graph model, lifecycle, utilities, execution variants, and documentation strategy can become. |
+| ADD-02 enables ADD-04 and ADD-05 | Once the system is modeled as Graph + Shared Store, Nodes become the units of graph behavior and Flows become the control structure between them. |
+| ADD-04 enables ADD-06 | The stable lifecycle makes it possible to define batch and async variants by changing execution behavior while preserving the same conceptual contract. |
+| ADD-05 enables ADD-06 | Action-labeled transitions make cookbook patterns such as agents, workflows, RAG, and MapReduce easy to express as examples. |
+| ADD-03 reinforces ADD-01 | Excluding provider and utility wrappers is necessary to keep the core small and dependency-free. |
+| ADD-03 conflicts with usability | Vendor independence and low maintenance are gained at the cost of more setup work for first-time users. |
+| ADD-04 conflicts with simplicity | Batch, async, and parallel variants increase expressiveness and performance but add more classes and concurrency concerns. |
+| ADD-06 compensates for ADD-03 and ADD-01 | Because the core excludes many conveniences, examples and agentic-coding guidance become the main way to transfer practical implementation knowledge. |
 
 ```mermaid
 graph TD
-    ADD05["ADD-05 100-line zero-dependency core"]
-    ADD01["ADD-01 Graph + Shared Store"]
-    ADD02["ADD-02 prep-exec-post Node lifecycle"]
-    ADD03["ADD-03 Action-labeled Flow transitions"]
-    ADD04["ADD-04 Exclude provider and utility wrappers"]
-    ADD06["ADD-06 Batch / Async / Parallel variants"]
-    ADD07["ADD-07 Cookbook and agentic-coding extension"]
+    ADD01["ADD-01 100-line zero-dependency core"]
+    ADD02["ADD-02 Graph + Shared Store"]
+    ADD03["ADD-03 No built-in utility functions"]
+    ADD04["ADD-04 Prep-Exec-Post Node lifecycle"]
+    ADD05["ADD-05 Action-based routing"]
+    ADD06["ADD-06 Agentic coding methodology"]
+    ADD07["ADD-07 Shared store as data contract"]
 
-    ADD05 -->|constrains| ADD01
-    ADD05 -->|constrains| ADD02
-    ADD05 -->|constrains| ADD03
-    ADD05 -->|constrains| ADD06
-    ADD05 -->|constrains| ADD07
-    ADD01 -->|enables| ADD02
-    ADD01 -->|enables| ADD03
-    ADD02 -->|enables| ADD06
-    ADD03 -->|enables examples for| ADD07
-    ADD04 -->|reinforces| ADD05
-    ADD04 -.->|usability trade-off| ADD07
-    ADD06 -.->|simplicity trade-off| ADD05
-    ADD07 -->|compensates for exclusions in| ADD04
+    ADD01 -->|constrains| ADD02
+    ADD01 -->|constrains| ADD03
+    ADD01 -->|constrains| ADD04
+    ADD01 -->|constrains| ADD05
+    ADD01 -->|constrains| ADD06
+    ADD01 -->|constrains| ADD07
+    ADD02 -->|enables| ADD04
+    ADD02 -->|enables| ADD05
+    ADD04 -->|enables| ADD06
+    ADD05 -->|enables examples for| ADD06
+    ADD03 -->|reinforces| ADD01
+    ADD03 -.->|usability trade-off| ADD06
+    ADD04 -.->|simplicity trade-off| ADD01
+    ADD06 -->|compensates for exclusions in| ADD03
 ```
+
+### 6.10 Key Relationships
+
+| Relationship | Explanation |
+|---|---|
+| Minimalist Core → Graph + Shared Store | The 100-line constraint forced the framework to adopt the simplest possible abstraction that could still support complex patterns |
+| Graph + Shared Store → Node Lifecycle Pattern | The graph abstraction requires a consistent node interface, leading to the Prep-Exec-Post pattern |
+| Graph + Shared Store → Action-Based Routing | The graph model needs a mechanism for edges, implemented as string actions returned by nodes |
+| Graph + Shared Store → Shared Store as Data Contract | The shared store is the communication mechanism between nodes in the graph |
+| No Built-in Utilities → Agentic Coding Methodology | Without built-in utilities, the framework relies on AI agents to implement project-specific utilities, making agentic coding essential |
+| Node Lifecycle Pattern → Agentic Coding | The consistent node pattern makes it easier for AI agents to implement nodes correctly |
 
 ---
 
