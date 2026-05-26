@@ -242,7 +242,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | Core Architecture |
 | Assumptions | Complex patterns can be built from simple primitives; developers prefer flexibility over convenience |
 | Alternatives | Full-featured frameworks like LangChain (405K lines), CrewAI (18K lines) |
-| Arguments | Reduces bloat, easier to understand, eliminates vendor lock-in, forces developers to understand fundamentals |
+| Arguments | **Pros:** Reduces bloat, makes the framework easier to understand, eliminates vendor lock-in, and forces developers to understand the fundamentals.<br>**Cons:** Provides fewer ready-made features, shifts more responsibility to application developers, and can slow down early prototyping. |
 | Implications | Users must implement their own utility functions; steeper initial learning curve |
 | Possible negative impact on quality | More initial setup work compared to batteries-included frameworks |
 
@@ -257,7 +257,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | Core Architecture |
 | Assumptions | Most LLM workflows can be modeled as directed graphs with shared state; state management is a cross-cutting concern |
 | Alternatives | Chain-based (linear sequences only), Agent-based only, Pipeline-based |
-| Arguments | More flexible than chains, simpler than full agent systems, enables complex patterns like loops and branching |
+| Arguments | **Pros:** More flexible than chains, simpler than full agent systems, and supports complex patterns such as loops, branching, and conditional execution.<br>**Cons:** Requires users to model work explicitly as graph nodes and edges, and can make large workflows harder to visualize without supporting documentation or diagrams. |
 | Implications | All workflows must be expressible as graphs; state management is explicit rather than implicit |
 | Possible negative impact on quality | May be limiting for workflows that don't fit graph model well |
 
@@ -272,7 +272,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | Framework Philosophy |
 | Assumptions | Vendor APIs change frequently; developers need flexibility to switch providers; optimizations are easier without lock-in |
 | Alternatives | Include comprehensive utility library like LangChain, include basic utilities with extension points |
-| Arguments | Avoids vendor lock-in, reduces maintenance burden, allows optimizations like prompt caching and streaming, enables switching between providers |
+| Arguments | **Pros:** Avoids vendor lock-in, reduces maintenance burden, allows project-specific optimizations such as prompt caching and streaming, and enables switching between providers.<br>**Cons:** Increases boilerplate, gives beginners less out-of-the-box help, and may lead to inconsistent utility implementations across projects. |
 | Implications | Developers must implement their own utilities; more initial setup but long-term flexibility |
 | Possible negative impact on quality | Higher barrier to entry; more boilerplate code for simple applications |
 
@@ -287,7 +287,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | Node Architecture |
 | Assumptions | Separation of concerns improves testability and retry logic; isolation enables portability |
 | Alternatives | Single execute method with direct shared access, event-driven pattern, functional composition |
-| Arguments | Enables safe retries (exec is idempotent), clear separation of data flow, easier testing, supports async operations |
+| Arguments | **Pros:** Enables safer retries when `exec` is idempotent, separates data preparation from computation and state updates, improves testability, and supports async operations.<br>**Cons:** Adds structure and boilerplate to simple nodes, and developers must learn where each responsibility belongs. |
 | Implications | All nodes must follow this pattern; some boilerplate required for simple operations |
 | Possible negative impact on quality | May feel verbose for simple operations; learning curve for the pattern |
 
@@ -302,7 +302,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | Flow Control |
 | Assumptions | String-based routing is sufficient for most workflows; conditional logic belongs in nodes not in flow definition |
 | Alternatives | Hard-coded successor chains, boolean conditions, complex routing DSL |
-| Arguments | Enables dynamic decision-making, supports loops and branching, simple to implement and understand |
+| Arguments | **Pros:** Enables dynamic decision-making, supports loops and branching, and stays simple to implement and understand.<br>**Cons:** Relies on consistent action names, provides no compile-time validation of routes, and can make execution paths harder to debug in complex flows. |
 | Implications | Flow control is decentralized to individual nodes; action naming becomes important |
 | Possible negative impact on quality | Action naming conventions must be consistent; debugging flow paths may be complex |
 
@@ -317,7 +317,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | Development Process |
 | Assumptions | Humans are better at system design; AI is better at implementation details; iterative refinement is necessary |
 | Alternatives | Fully human-driven development, fully AI-driven development, pair programming approach |
-| Arguments | Leverages strengths of both humans and AI, enables rapid iteration, reduces human implementation burden |
+| Arguments | **Pros:** Leverages human strengths in architecture and AI strengths in implementation, enables rapid iteration, and reduces repetitive coding effort.<br>**Cons:** Depends on the quality of AI-generated code, requires careful human review, and may not fit teams that need fully deterministic or compliance-heavy development processes. |
 | Implications | Requires clear design documentation; humans must understand framework well enough to design effectively |
 | Possible negative impact on quality | Dependency on AI quality; may not work for all team structures |
 
@@ -332,7 +332,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Group | State Management |
 | Assumptions | Dictionary-based state is sufficient for most use cases; explicit data contracts improve maintainability |
 | Alternatives | Message passing, function parameters, event bus, database-backed state |
-| Arguments | Simple and flexible; enables loose coupling between nodes; supports both in-memory and persistent implementations |
+| Arguments | **Pros:** Simple and flexible, enables loose coupling between nodes, and supports both in-memory and persistent implementations.<br>**Cons:** Lacks compile-time schema enforcement, can produce runtime errors when keys are missing or misused, and requires disciplined data contract documentation. |
 | Implications | Data schema design becomes critical; potential for data inconsistency if contract not followed |
 | Possible negative impact on quality | No compile-time checking of data contracts; runtime errors possible |
 
