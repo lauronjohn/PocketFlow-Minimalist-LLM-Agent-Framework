@@ -336,46 +336,7 @@ This section documents PocketFlow's key architecture design decisions using the 
 | Implications | Data schema design becomes critical; potential for data inconsistency if contract not followed |
 | Possible negative impact on quality | No compile-time checking of data contracts; runtime errors possible |
 
-### 6.9 Relationships Between Architecture Design Decisions
-
-The decisions form a graph rather than a flat list. In the course terminology, issues and options are not independent; one decision can constrain, enable, exclude, subsume, conflict with, or reinforce another decision.
-
-| Relationship | Explanation |
-|---|---|
-| ADD-01 constrains ADD-02 to ADD-07 | The 100-line, zero-dependency constraint limits how elaborate the graph model, lifecycle, utilities, execution variants, and documentation strategy can become. |
-| ADD-02 enables ADD-04 and ADD-05 | Once the system is modeled as Graph + Shared Store, Nodes become the units of graph behavior and Flows become the control structure between them. |
-| ADD-04 enables ADD-06 | The stable lifecycle makes it possible to define batch and async variants by changing execution behavior while preserving the same conceptual contract. |
-| ADD-05 enables ADD-06 | Action-labeled transitions make cookbook patterns such as agents, workflows, RAG, and MapReduce easy to express as examples. |
-| ADD-03 reinforces ADD-01 | Excluding provider and utility wrappers is necessary to keep the core small and dependency-free. |
-| ADD-03 conflicts with usability | Vendor independence and low maintenance are gained at the cost of more setup work for first-time users. |
-| ADD-04 conflicts with simplicity | Batch, async, and parallel variants increase expressiveness and performance but add more classes and concurrency concerns. |
-| ADD-06 compensates for ADD-03 and ADD-01 | Because the core excludes many conveniences, examples and agentic-coding guidance become the main way to transfer practical implementation knowledge. |
-
-```mermaid
-graph TD
-    ADD01["ADD-01 100-line zero-dependency core"]
-    ADD02["ADD-02 Graph + Shared Store"]
-    ADD03["ADD-03 No built-in utility functions"]
-    ADD04["ADD-04 Prep-Exec-Post Node lifecycle"]
-    ADD05["ADD-05 Action-based routing"]
-    ADD06["ADD-06 Agentic coding methodology"]
-    ADD07["ADD-07 Shared store as data contract"]
-
-    ADD01 -->|constrains| ADD02
-    ADD01 -->|constrains| ADD03
-    ADD01 -->|constrains| ADD04
-    ADD01 -->|constrains| ADD05
-    ADD01 -->|constrains| ADD06
-    ADD01 -->|constrains| ADD07
-    ADD02 -->|enables| ADD04
-    ADD02 -->|enables| ADD05
-    ADD04 -->|enables| ADD06
-    ADD05 -->|enables examples for| ADD06
-    ADD03 -->|reinforces| ADD01
-    ADD03 -.->|usability trade-off| ADD06
-    ADD04 -.->|simplicity trade-off| ADD01
-    ADD06 -->|compensates for exclusions in| ADD03
-```
+<img width="2504" height="1430" alt="achitecture-decisions" src="https://github.com/user-attachments/assets/a9226abe-e24f-4d22-8a7f-8dd1f1fb47d5" />
 
 ### 6.10 Key Relationships
 
