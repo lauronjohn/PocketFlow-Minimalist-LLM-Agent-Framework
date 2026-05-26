@@ -217,7 +217,7 @@ This PocketFlow Context View shows PocketFlow as the central system and the exte
 
 ## 6. Architecture Design Decisions
 
-This section documents PocketFlow's key architecture design decisions using the course template from the lecture slides on architectural decisions: **Issue, Importance, Decision, Status, Group, Assumptions, Alternatives, Arguments, Implications, and Possible negative impact on quality**. The decisions below are recovered from the official PocketFlow repository and documentation, including its GitHub README, core documentation, and the 100-line Python implementation.
+This section documents PocketFlow's key architecture design decisions using the course template from the lecture slides on architectural decisions: **Issue, Importance, Decision, Status, Group, Assumptions, Alternatives, Arguments, Implications, and Possible negative impact on quality**. 
 
 ### 6.1 Decision Overview
 
