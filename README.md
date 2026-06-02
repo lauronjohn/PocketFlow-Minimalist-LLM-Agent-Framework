@@ -1,8 +1,8 @@
 # PocketFlow — Software Architecture Recovery
 
-> **Course:** Modern Software Architecture — Wuhan University, 2026
-> **Instructor:** Prof. Peng Liang
-> **Target System:** [PocketFlow](https://github.com/The-Pocket/PocketFlow)
+> **Course:** Modern Software Architecture — Wuhan University, 2026<br>
+> **Instructor:** Prof. Peng Liang<br>
+> **Target System:** [PocketFlow](https://github.com/The-Pocket/PocketFlow)<br>
 > **Frameworks:** [DESOSA 2019](https://se.ewi.tudelft.nl/desosa2019/) · Rozanski & Woods (2012) · Kruchten 4+1 (1995) · ISO/IEC/IEEE 42010:2011
 
 ---
