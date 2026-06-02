@@ -182,83 +182,7 @@ The **Logical View** (Kruchten, 1995; Rozanski & Woods' *Functional Viewpoint*) 
 
 PocketFlow's core abstraction hierarchy is defined entirely within `pocketflow/__init__.py`. The complete type hierarchy is shown below.
 
-```mermaid
-classDiagram
-    class BaseNode {
-        +params : dict
-        +successors : dict
-        +prep(shared) prep_res
-        +exec(prep_res) exec_res
-        +post(shared, prep_res, exec_res) action
-        +_run(shared) action
-        +set_params(params)
-        +__rshift__(other) BaseNode
-    }
-
-    class Node {
-        +max_retries : int
-        +wait : float
-        +exec_fallback(prep_res, exc) exec_res
-    }
-
-    class BatchNode {
-        +_exec(items)
-    }
-
-    class AsyncNode {
-        +prep_async(shared) prep_res
-        +exec_async(prep_res) exec_res
-        +exec_fallback_async(prep_res, exc) exec_res
-        +post_async(shared, prep_res, exec_res) action
-        +_run_async(shared) action
-    }
-
-    class AsyncBatchNode {
-    }
-
-    class AsyncParallelBatchNode {
-    }
-
-    class Flow {
-        +start_node : BaseNode
-        +_orch(shared, params) action
-        +_run(shared) action
-    }
-
-    class BatchFlow {
-        +_run(shared) action
-    }
-
-    class AsyncFlow {
-        +_orch_async(shared, params) action
-        +_run_async(shared) action
-    }
-
-    class AsyncBatchFlow {
-    }
-
-    class AsyncParallelBatchFlow {
-    }
-
-    BaseNode <|-- Node
-    BaseNode <|-- Flow
-    Node <|-- BatchNode
-    Node <|-- AsyncNode
-    AsyncNode <|-- AsyncBatchNode
-    BatchNode <|-- AsyncBatchNode
-    AsyncNode <|-- AsyncParallelBatchNode
-    BatchNode <|-- AsyncParallelBatchNode
-    Flow <|-- BatchFlow
-    Flow <|-- AsyncFlow
-    AsyncNode <|-- AsyncFlow
-    AsyncFlow <|-- AsyncBatchFlow
-    BatchFlow <|-- AsyncBatchFlow
-    AsyncFlow <|-- AsyncParallelBatchFlow
-    BatchFlow <|-- AsyncParallelBatchFlow
-
-    BaseNode "1" --> "0..*" BaseNode : successors
-    Flow --> BaseNode : start_node
-```
+![alt text](assets/image-20.png)
 
 | Class | Role | Key Responsibility |
 |---|---|---|
@@ -278,51 +202,13 @@ classDiagram
 
 The fundamental architectural abstraction is a **nested directed graph with a shared store**:
 
-```mermaid
-graph TD
-    subgraph OuterFlow["Outer Flow"]
-        N1["NodeA"] -->|default| N2["NodeB"]
-        N2 -->|approve| SF["Sub-Flow\nnested Flow node"]
-        N2 -->|reject| N3["NodeC"]
-        SF -->|done| N4["NodeD"]
-
-        subgraph SF_inner["Sub-Flow internal"]
-            S1["SubNode1"] -->|default| S2["SubNode2"]
-        end
-    end
-
-    SS[("Shared Store\n{dict}")] <-->|read/write| N1
-    SS <-->|read/write| N2
-    SS <-->|read/write| SF
-    SS <-->|read/write| N3
-    SS <-->|read/write| N4
-
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-    style OuterFlow fill:#e3f2fd,stroke:#1565c0
-    style SF_inner fill:#fce4ec,stroke:#c62828
-```
+![alt text](assets/image-21.png)
 
 ### 4.3 Information View: Shared Store Data Contract
 
 The **Shared Store** is PocketFlow's central data-exchange mechanism — a plain Python dictionary designed upfront as an explicit **data contract**. This corresponds to the *Information Viewpoint* in Rozanski & Woods.
 
-```mermaid
-graph LR
-    subgraph Contract["Shared Store Contract (designed first)"]
-        K1["input_text : str"]
-        K2["retrieved_docs : list"]
-        K3["llm_response : str"]
-        K4["final_output : str"]
-    end
-
-    N1["RetrieveNode\nwrites retrieved_docs"] -->|writes| K2
-    N2["GenerateNode\nreads retrieved_docs\nwrites llm_response"] -->|reads| K2
-    N2 -->|writes| K3
-    N3["FormatNode\nreads llm_response\nwrites final_output"] -->|reads| K3
-    N3 -->|writes| K4
-
-    style Contract fill:#fff9c4,stroke:#f57f17
-```
+![alt text](assets/image-22.png)
 
 The shared store schema is designed *before* implementing any node. This "schema-first" approach prevents runtime key errors and is a direct consequence of ADD-07 (Shared Store as Data Contract).
 
