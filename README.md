@@ -309,9 +309,9 @@ graph TD
         NodeB["Node B<br>(prep/exec/post)"]
         SubFlow["Sub-Flow (Nested Node)<br>(Orchestration Only)"]
 
-        NodeA -->|'"default"'| NodeB
-        NodeB -->|'"retry"'| NodeA
-        NodeA -->|'"approve"'| SubFlow
+        NodeA -->|"default"| NodeB
+        NodeB -->|"retry"| NodeA
+        NodeA -->|"approve"| SubFlow
     end
 
     %% Communication Links
