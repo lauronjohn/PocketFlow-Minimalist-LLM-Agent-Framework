@@ -398,7 +398,7 @@ PyYAML
 
 ### 5.6 Key Development Constraints: The Three Zeros
 
-![alt text](image-4.png)
+![alt text](assets/image-4.png)
 
 This diagram presents the “Three Zeros Philosophy” as a set of development constraints focused on keeping Pocketflow lightweight, safe, and flexible. It highlights three principles: Zero Bloat, meaning the core stays minimal and intentional; Zero Dependencies, meaning the project relies only on Python’s standard library to avoid conflicts and supply-chain risk; and Zero Vendor Lock-in, meaning users retain control of their utilities and can switch LLM providers freely.
 
@@ -410,11 +410,11 @@ The **Process View** (Kruchten, 1995; Rozanski & Woods' *Concurrency Viewpoint*)
 
 ### 6.1 Runtime Architecture Overview
 
-![alt text](image-5.png)
+![alt text](assets/image-5.png)
 
 ### 6.2 Node Execution Lifecycle: Phase Isolation and Fault Tolerance
 
-![alt text](image-6.png)
+![alt text](assets/image-6.png)
 
 ### 6.3 Flow Orchestration and Action-Based Routing
 
@@ -446,7 +446,7 @@ def _orch(self, shared, params=None):
 
 ### 6.5 Concurrency Patterns
 
-![alt text](image-7.png)
+![alt text](assets/image-7.png)
 
 ### 6.6 Error Handling and Fault Tolerance
 
@@ -471,7 +471,7 @@ The **Deployment View** (Kruchten, 1995; Rozanski & Woods' *Deployment Viewpoint
 
 ### 7.1 Distribution and Installation Model
 
-![alt text](image-8.png)
+![alt text](assets/image-8.png)
 
 The deployment boundary enforced by ADD-03 (No Built-in Utilities) means PocketFlow's installation footprint is 56 KB. All heavyweight dependencies live in the user's zone.
 
@@ -690,13 +690,13 @@ PocketFlow's Shared Store is an instance of the **Blackboard** architectural pat
 
 The Prep–Exec–Post lifecycle is an instance of the **Template Method** pattern (GoF). `BaseNode._run()` defines the fixed algorithm skeleton; concrete subclasses override the individual steps.
 
-![alt text](image-9.png)
+![alt text](assets/image-9.png)
 
 ### 9.3 GoF Pattern: Mediator (Flow Orchestration)
 
 The `Flow` class implements the **Mediator** pattern — it centralises coordination so nodes never communicate directly. The `_orch` loop is the sole routing authority.
 
-![alt text](image-10.png)
+![alt text](assets/image-10.png)
 
 ### 9.4 Application-Level Patterns (Cookbook)
 
@@ -715,53 +715,53 @@ The `Flow` class implements the **Mediator** pattern — it centralises coordina
 
 A central **DecideAction** node calls the LLM to decide the next step and returns a routing action string. Tool nodes execute the action and return `"decide"` to loop back. The flow halts when `DecideAction` returns `"answer"`.
 
-![alt text](image-11.png)
+![alt text](assets/image-11.png)
 
 #### Workflow
 
 A sequential chain of specialised nodes, each reading from and writing to the shared store. No branching — ideal for deterministic multi-step pipelines.
 
-![alt text](image-12.png)
+![alt text](assets/image-12.png)
 
 #### RAG (Retrieval-Augmented Generation)
 
 Two separate flows: an **offline indexing flow** that builds the vector index using `BatchNode`s for chunking and embedding, and an **online query flow** that retrieves context and generates an answer.
 
-![alt text](image-13.png)
+![alt text](assets/image-13.png)
 
 #### Map-Reduce
 
 A `BatchNode` iterates `exec()` sequentially over each item returned by `prep()`, then a dedicated **ReduceNode** aggregates all results into a single output. For parallel execution, `AsyncParallelBatchNode` is used instead.
 
-![alt text](image-14.png)
+![alt text](assets/image-14.png)
 
 #### Structured Output
 
 Validation happens **inside** a single node's `exec()` using `assert` or Pydantic. A raised exception triggers the node's internal retry mechanism (`max_retries`) — there is no flow-level routing loop between nodes.
 
-![alt text](image-15.png)
+![alt text](assets/image-15.png)
 
 #### Multi-Agent
 
 Each agent is an `AsyncNode` with a **self-loop** (`"continue" >> self`). Agents communicate exclusively through `asyncio.Queue` objects stored in the shared store. Both agents run concurrently via `asyncio.gather()` — there is no central coordinator.
 
-![alt text](image-16.png)
+![alt text](assets/image-16.png)
 
 #### Chain-of-Thought
 
 A single node accumulates reasoning steps in `shared["thoughts"]` and self-loops via `"continue"` until the LLM signals completion with `"end"`. Each iteration reads prior thoughts, queries the LLM for the next step, and appends the result.
 
-![alt text](image-17.png)
+![alt text](assets/image-17.png)
 
 #### Memory Management
 
 Combines a **sliding window** for short-term memory (`shared["messages"]`, ~6 messages) with a **FAISS vector index** for long-term memory (`shared["vector_index"]`). The `EmbedNode` archives oldest messages when the window overflows; `RetrieveNode` injects relevant past context at the start of each turn.
 
-![alt text](image-18.png)
+![alt text](assets/image-18.png)
 
 ### 9.5 Pattern Summary
 
-![alt text](image-19.png)
+![alt text](assets/image-19.png)
 
 ---
 
