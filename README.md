@@ -398,22 +398,9 @@ PyYAML
 
 ### 5.6 Key Development Constraints: The Three Zeros
 
-```mermaid
-mindmap
-  root((Three Zeros\nPhilosophy))
-    Zero Bloat
-      Core limited to 100 lines
-      No feature creep
-      Every line intentional
-    Zero Dependencies
-      Python stdlib only
-      No version conflicts
-      No supply chain risk
-    Zero Vendor Lock-in
-      No bundled LLM wrappers
-      Users own their utils/
-      Switch providers freely
-```
+![alt text](image-4.png)
+
+This diagram presents the “Three Zeros Philosophy” as a set of development constraints focused on keeping Pocketflow lightweight, safe, and flexible. It highlights three principles: Zero Bloat, meaning the core stays minimal and intentional; Zero Dependencies, meaning the project relies only on Python’s standard library to avoid conflicts and supply-chain risk; and Zero Vendor Lock-in, meaning users retain control of their utilities and can switch LLM providers freely.
 
 ---
 
@@ -423,58 +410,11 @@ The **Process View** (Kruchten, 1995; Rozanski & Woods' *Concurrency Viewpoint*)
 
 ### 6.1 Runtime Architecture Overview
 
-```mermaid
-graph TD
-    subgraph Storage["State Management"]
-        SharedStore[("Shared Store\nGlobal Dictionary / Data Contract")]
-    end
-
-    subgraph FlowOrchestrator["Flow Orchestrator: _orch loop"]
-        NodeA["Node A\nprep / exec / post"]
-        NodeB["Node B\nprep / exec / post"]
-        SubFlow["Sub-Flow\nNested Node"]
-
-        NodeA -->|default| NodeB
-        NodeB -->|retry| NodeA
-        NodeA -->|approve| SubFlow
-    end
-
-    NodeA <-->|Reads / Writes| SharedStore
-    NodeB <-->|Reads / Writes| SharedStore
-    SubFlow <-->|Reads / Writes| SharedStore
-
-    style SharedStore fill:#f9a825,stroke:#e65100,color:#000
-    style FlowOrchestrator fill:#e8f5e9,stroke:#2e7d32,stroke-dasharray:5 5
-```
+![alt text](image-5.png)
 
 ### 6.2 Node Execution Lifecycle: Phase Isolation and Fault Tolerance
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Store as Shared Store
-    participant Node as PocketFlow Node Engine
-    participant Ext as External Service / LLM
-
-    Note over Node: Phase 1 — prep()
-    Node->>Store: prep(shared) — read state
-    Store-->>Node: return prep_res
-
-    Note over Node: Phase 2 — exec() isolated from Shared Store
-    loop Retry Loop up to max_retries
-        Node->>Ext: exec(prep_res) — LLM / API call
-        alt Success
-            Ext-->>Node: return exec_res
-        else Exception
-            Ext-->>Node: raise Exception — increment cur_retry
-            Note over Node: If retries exhausted: exec_fallback()
-        end
-    end
-
-    Note over Node: Phase 3 — post()
-    Node->>Store: post(shared, prep_res, exec_res) — write results
-    Node->>Node: return Action string
-```
+![alt text](image-6.png)
 
 ### 6.3 Flow Orchestration and Action-Based Routing
 
@@ -506,23 +446,7 @@ def _orch(self, shared, params=None):
 
 ### 6.5 Concurrency Patterns
 
-```mermaid
-graph TD
-    subgraph BatchNode["Standard Batch — BatchNode"]
-        B_prep["prep() returns List"] --> B_loop{for each item}
-        B_loop -->|sequential| B_exec1["exec(item 1)"]
-        B_exec1 --> B_exec2["exec(item 2)"]
-        B_exec2 --> B_post["post() receives List of results"]
-    end
-
-    subgraph AsyncParallel["Parallel Async — AsyncParallelBatchNode"]
-        P_prep["prep_async() returns List"] --> P_gather["asyncio.gather()"]
-        P_gather --> P_exec1["exec_async(item 1)"]
-        P_gather --> P_exec2["exec_async(item 2)"]
-        P_gather --> P_exec3["exec_async(item 3)"]
-        P_exec1 & P_exec2 & P_exec3 --> P_post["post_async() receives List of results"]
-    end
-```
+![alt text](image-7.png)
 
 ### 6.6 Error Handling and Fault Tolerance
 
@@ -547,35 +471,7 @@ The **Deployment View** (Kruchten, 1995; Rozanski & Woods' *Deployment Viewpoint
 
 ### 7.1 Distribution and Installation Model
 
-```mermaid
-graph LR
-    subgraph Maintainer["Maintainer"]
-        SRC["pocketflow/__init__.py\n100 lines"]
-        PKG["PyPI Package\npocketflow"]
-        SRC -->|pip publish| PKG
-    end
-
-    subgraph Developer["LLM Developer / Project"]
-        INST["pip install pocketflow"]
-        APP["Application\nnodes.py / flow.py / main.py"]
-        INST --> APP
-    end
-
-    subgraph UserDeps["User-Managed Integrations"]
-        LLM["LLM Provider SDK\nopenai, anthropic..."]
-        VDB["Vector Database\nchromadb, faiss..."]
-        TOOLS["Tool APIs\nsearch, files, MCP..."]
-    end
-
-    PKG -->|PyPI distribution| INST
-    APP -->|utils/call_llm.py| LLM
-    APP -->|utils/retrieval.py| VDB
-    APP -->|utils/tools.py| TOOLS
-
-    style Maintainer fill:#e8f5e9,stroke:#2e7d32
-    style Developer fill:#e3f2fd,stroke:#1565c0
-    style UserDeps fill:#fff3e0,stroke:#e65100
-```
+![alt text](image-8.png)
 
 The deployment boundary enforced by ADD-03 (No Built-in Utilities) means PocketFlow's installation footprint is 56 KB. All heavyweight dependencies live in the user's zone.
 
@@ -794,47 +690,13 @@ PocketFlow's Shared Store is an instance of the **Blackboard** architectural pat
 
 The Prep–Exec–Post lifecycle is an instance of the **Template Method** pattern (GoF). `BaseNode._run()` defines the fixed algorithm skeleton; concrete subclasses override the individual steps.
 
-```mermaid
-classDiagram
-    class BaseNode {
-        <<Abstract Template>>
-        +_run(shared) action
-        +prep(shared) prep_res
-        +exec(prep_res) exec_res
-        +post(shared, prep_res, exec_res) action
-    }
-    note for BaseNode "_run() invariant skeleton:\n1. prep_res = prep(shared)\n2. exec_res = exec(prep_res)\n3. return post(shared, prep_res, exec_res)"
-
-    class ConcreteNode {
-        <<Subclass overrides hooks>>
-        +prep(shared) prep_res
-        +exec(prep_res) exec_res
-        +post(shared, prep_res, exec_res) action
-    }
-    BaseNode <|-- ConcreteNode
-```
+![alt text](image-9.png)
 
 ### 9.3 GoF Pattern: Mediator (Flow Orchestration)
 
 The `Flow` class implements the **Mediator** pattern — it centralises coordination so nodes never communicate directly. The `_orch` loop is the sole routing authority.
 
-```mermaid
-sequenceDiagram
-    participant Flow as Flow (Mediator)
-    participant NodeA
-    participant NodeB
-    participant NodeC
-
-    Flow->>NodeA: _run(shared)
-    NodeA-->>Flow: "approve"
-    Note over Flow: Lookup successor for "approve" — NodeB
-    Flow->>NodeB: _run(shared)
-    NodeB-->>Flow: "default"
-    Note over Flow: Lookup successor for "default" — NodeC
-    Flow->>NodeC: _run(shared)
-    NodeC-->>Flow: "done"
-    Note over Flow: No successor for "done" — halt
-```
+![alt text](image-10.png)
 
 ### 9.4 Application-Level Patterns (Cookbook)
 
@@ -853,182 +715,53 @@ sequenceDiagram
 
 A central **DecideAction** node calls the LLM to decide the next step and returns a routing action string. Tool nodes execute the action and return `"decide"` to loop back. The flow halts when `DecideAction` returns `"answer"`.
 
-```mermaid
-graph TD
-    Start(["Start"]) --> D["DecideAction\nLLM chooses next action"]
-    D -->|search| S["SearchWeb\nCall search API"]
-    D -->|answer| A["DirectAnswer\nFormat final answer"]
-    A --> End(["End"])
-    S -->|decide| D
-
-    SS[("Shared Store\n{query, context,\nsearch_term, answer}")] <-->|read/write| D
-    SS <-->|read/write| S
-    SS <-->|read/write| A
-
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-    style D fill:#e3f2fd,stroke:#1565c0
-```
+![alt text](image-11.png)
 
 #### Workflow
 
 A sequential chain of specialised nodes, each reading from and writing to the shared store. No branching — ideal for deterministic multi-step pipelines.
 
-```mermaid
-graph LR
-    A["ExtractNode\nParse input"] -->|default| B["TransformNode\nProcess data"]
-    B -->|default| C["EnrichNode\nAugment with LLM"]
-    C -->|default| D["FormatNode\nProduce output"]
-
-    SS[("Shared Store")] <-->|read/write| A & B & C & D
-
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-```
+![alt text](image-12.png)
 
 #### RAG (Retrieval-Augmented Generation)
 
 Two separate flows: an **offline indexing flow** that builds the vector index using `BatchNode`s for chunking and embedding, and an **online query flow** that retrieves context and generates an answer.
 
-```mermaid
-graph TD
-    subgraph Offline["Offline — Indexing Flow"]
-        O1["ChunkDocs\n(BatchNode)\nshared[files] → shared[all_chunks]"] -->|default| O2["EmbedDocs\n(BatchNode)\nshared[all_chunks] → shared[all_embeds]"]
-        O2 -->|default| O3["StoreIndex\n(Node)\nshared[all_embeds] → shared[index]"]
-    end
-
-    subgraph Online["Online — Query Flow"]
-        Q1["EmbedQuery\n(Node)\nshared[question] → shared[q_emb]"] -->|default| Q2["RetrieveDocs\n(Node)\nshared[q_emb] → shared[retrieved_chunk]"]
-        Q2 -->|default| Q3["GenerateAnswer\n(Node)\nshared[retrieved_chunk] → shared[answer]"]
-    end
-
-    O3 -. "shared[index]" .-> Q2
-
-    style Offline fill:#e8f5e9,stroke:#2e7d32
-    style Online fill:#e3f2fd,stroke:#1565c0
-    style O1 fill:#c8e6c9,stroke:#2e7d32
-    style O2 fill:#c8e6c9,stroke:#2e7d32
-```
+![alt text](image-13.png)
 
 #### Map-Reduce
 
 A `BatchNode` iterates `exec()` sequentially over each item returned by `prep()`, then a dedicated **ReduceNode** aggregates all results into a single output. For parallel execution, `AsyncParallelBatchNode` is used instead.
 
-```mermaid
-graph TD
-    IN["InputNode\nLoad N documents"] -->|default| MAP["BatchNode\nmap: summarise each doc\nexec runs N times"]
-    MAP -->|default| RED["ReduceNode\nreduce: merge N summaries\ninto final report"]
-    RED -->|default| OUT["OutputNode\nWrite final report"]
-
-    SS[("Shared Store\n{docs[ ], summaries[ ],\nfinal_report}")] <-->|read/write| IN & MAP & RED & OUT
-
-    style MAP fill:#e3f2fd,stroke:#1565c0
-    style RED fill:#fce4ec,stroke:#c62828
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-```
+![alt text](image-14.png)
 
 #### Structured Output
 
 Validation happens **inside** a single node's `exec()` using `assert` or Pydantic. A raised exception triggers the node's internal retry mechanism (`max_retries`) — there is no flow-level routing loop between nodes.
 
-```mermaid
-graph TD
-    Start(["Start"]) --> N["GenerateAndValidateNode\nNode(max_retries=3)\n─────────────────\nexec():\n  raw = call_llm(prompt)\n  result = parse_json(raw)\n  assert validate_schema(result)\n  return result"]
-    N -->|success on valid output| End(["End\nstructured result in shared store"])
-    N -->|exception on invalid output| Retry["Internal Retry\ncur_retry += 1\nre-runs exec()"]
-    Retry --> N
-    Retry -->|retries exhausted| Fallback["exec_fallback()\ndegrades gracefully"]
-
-    style N fill:#e3f2fd,stroke:#1565c0
-    style Retry fill:#fce4ec,stroke:#c62828
-```
+![alt text](image-15.png)
 
 #### Multi-Agent
 
 Each agent is an `AsyncNode` with a **self-loop** (`"continue" >> self`). Agents communicate exclusively through `asyncio.Queue` objects stored in the shared store. Both agents run concurrently via `asyncio.gather()` — there is no central coordinator.
 
-```mermaid
-graph TD
-    subgraph Concurrent["asyncio.gather() — runs both agents concurrently"]
-        subgraph AgentA["Hinter (AsyncNode)"]
-            H["HinterNode\nprep_async: recv from guesser_queue\nexec_async: LLM generates hint\npost_async: put hint in hinter_queue"]
-            H -->|continue| H
-        end
-
-        subgraph AgentB["Guesser (AsyncNode)"]
-            G["GuesserNode\nprep_async: recv from hinter_queue\nexec_async: LLM makes a guess\npost_async: put guess in guesser_queue"]
-            G -->|continue| G
-        end
-    end
-
-    SS[("Shared Store\n{target_word,\nforbidden_words,\nhinter_queue: asyncio.Queue,\nguesser_queue: asyncio.Queue}")] <-->|read/write| H
-    SS <-->|read/write| G
-
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-    style AgentA fill:#e3f2fd,stroke:#1565c0
-    style AgentB fill:#fce4ec,stroke:#c62828
-```
+![alt text](image-16.png)
 
 #### Chain-of-Thought
 
 A single node accumulates reasoning steps in `shared["thoughts"]` and self-loops via `"continue"` until the LLM signals completion with `"end"`. Each iteration reads prior thoughts, queries the LLM for the next step, and appends the result.
 
-```mermaid
-graph TD
-    Start(["Start\nshared[problem]"]) --> CoT["ChainOfThoughtNode\n─────────────────\nprep(): format prior thoughts for prompt\nexec(): call LLM, parse YAML plan step\npost(): append to shared[thoughts]\n        return 'continue' or 'end'"]
-    CoT -->|continue| CoT
-    CoT -->|end| End(["End\nshared[solution]"])
-
-    SS[("Shared Store\n{problem,\nthoughts: [ ],\ncurrent_thought_number,\nsolution}")] <-->|read/write| CoT
-
-    style CoT fill:#e3f2fd,stroke:#1565c0
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-```
+![alt text](image-17.png)
 
 #### Memory Management
 
 Combines a **sliding window** for short-term memory (`shared["messages"]`, ~6 messages) with a **FAISS vector index** for long-term memory (`shared["vector_index"]`). The `EmbedNode` archives oldest messages when the window overflows; `RetrieveNode` injects relevant past context at the start of each turn.
 
-```mermaid
-graph TD
-    Start(["New user turn"]) --> R["RetrieveNode\nQuery FAISS index\nshared[vector_index] → shared[retrieved_conversation]"]
-    R -->|default| A["AnswerNode\nLLM call using:\n- shared[retrieved_conversation]\n- shared[messages] (last 3 pairs)"]
-    A -->|default| E["EmbedNode\nIf messages > window size:\n  embed oldest pair → add to FAISS\n  trim shared[messages]"]
-    E -->|continue| R
-
-    SS[("Shared Store\n{messages: [ ] sliding window,\nvector_index: FAISS,\nretrieved_conversation}")] <-->|read/write| R & A & E
-
-    style R fill:#e8f5e9,stroke:#2e7d32
-    style A fill:#e3f2fd,stroke:#1565c0
-    style E fill:#fff3e0,stroke:#e65100
-    style SS fill:#f9a825,stroke:#e65100,color:#000
-```
+![alt text](image-18.png)
 
 ### 9.5 Pattern Summary
 
-```mermaid
-mindmap
-  root((PocketFlow\nPatterns))
-    Architectural Style
-      Blackboard
-        Shared Store as blackboard
-        Nodes as transformers
-        No inter-node coupling
-    GoF Design Patterns
-      Template Method
-        prep-exec-post skeleton
-        BaseNode._run as template
-      Mediator
-        Flow._orch as coordinator
-        No direct node-to-node calls
-    Application-Level Patterns
-      Agent Loop
-      Sequential Workflow
-      RAG Pipeline
-      Map-Reduce
-      Structured Output
-      Multi-Agent
-      Chain-of-Thought
-      Memory Management
-```
+![alt text](image-19.png)
 
 ---
 
