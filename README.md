@@ -852,23 +852,19 @@ sequenceDiagram
 
 #### Agent
 
-The agent loop is driven by a central **DecisionNode** that calls the LLM, interprets its output as an action, and routes to the appropriate tool node. The loop continues until the LLM returns `"done"`.
+A central **DecideAction** node calls the LLM to decide the next step and returns a routing action string. Tool nodes execute the action and return `"decide"` to loop back. The flow halts when `DecideAction` returns `"answer"`.
 
 ```mermaid
 graph TD
-    Start(["Start"]) --> D["DecisionNode\nLLM decides next action"]
-    D -->|search| S["SearchNode\nCall search API"]
-    D -->|calculate| C["CalculatorNode\nRun computation"]
-    D -->|respond| R["RespondNode\nFormat final answer"]
-    D -->|done| End(["End"])
-    S -->|loop| D
-    C -->|loop| D
-    R -->|loop| D
+    Start(["Start"]) --> D["DecideAction\nLLM chooses next action"]
+    D -->|search| S["SearchWeb\nCall search API"]
+    D -->|answer| A["DirectAnswer\nFormat final answer"]
+    A --> End(["End"])
+    S -->|decide| D
 
-    SS[("Shared Store\n{query, history,\nresult}")] <-->|read/write| D
+    SS[("Shared Store\n{query, context,\nsearch_term, answer}")] <-->|read/write| D
     SS <-->|read/write| S
-    SS <-->|read/write| C
-    SS <-->|read/write| R
+    SS <-->|read/write| A
 
     style SS fill:#f9a825,stroke:#e65100,color:#000
     style D fill:#e3f2fd,stroke:#1565c0
@@ -891,26 +887,26 @@ graph LR
 
 #### RAG (Retrieval-Augmented Generation)
 
-Two separate flows: an **offline indexing flow** that builds the vector index, and an **online query flow** that retrieves context and generates an answer.
+Two separate flows: an **offline indexing flow** that builds the vector index using `BatchNode`s for chunking and embedding, and an **online query flow** that retrieves context and generates an answer.
 
 ```mermaid
 graph TD
     subgraph Offline["Offline — Indexing Flow"]
-        O1["LoadDocsNode\nLoad source documents"] -->|default| O2["ChunkNode\nSplit into chunks"]
-        O2 -->|default| O3["EmbedNode\nEmbed via LLM API"]
-        O3 -->|default| O4["StoreNode\nSave to vector DB"]
+        O1["ChunkDocs\n(BatchNode)\nshared[files] → shared[all_chunks]"] -->|default| O2["EmbedDocs\n(BatchNode)\nshared[all_chunks] → shared[all_embeds]"]
+        O2 -->|default| O3["StoreIndex\n(Node)\nshared[all_embeds] → shared[index]"]
     end
 
     subgraph Online["Online — Query Flow"]
-        Q1["EmbedQueryNode\nEmbed user query"] -->|default| Q2["RetrieveNode\nTop-K from vector DB"]
-        Q2 -->|default| Q3["GenerateNode\nLLM answer with context"]
-        Q3 -->|default| Q4["RespondNode\nReturn to user"]
+        Q1["EmbedQuery\n(Node)\nshared[question] → shared[q_emb]"] -->|default| Q2["RetrieveDocs\n(Node)\nshared[q_emb] → shared[retrieved_chunk]"]
+        Q2 -->|default| Q3["GenerateAnswer\n(Node)\nshared[retrieved_chunk] → shared[answer]"]
     end
 
-    O4 -. "vector DB" .-> Q2
+    O3 -. "shared[index]" .-> Q2
 
     style Offline fill:#e8f5e9,stroke:#2e7d32
     style Online fill:#e3f2fd,stroke:#1565c0
+    style O1 fill:#c8e6c9,stroke:#2e7d32
+    style O2 fill:#c8e6c9,stroke:#2e7d32
 ```
 
 #### Map-Reduce
@@ -932,55 +928,44 @@ graph TD
 
 #### Structured Output
 
-A generate–validate–retry loop ensures the LLM output conforms to a required schema. The `ValidateNode` routes back to `GenerateNode` on failure, up to `max_retries`.
+Validation happens **inside** a single node's `exec()` using `assert` or Pydantic. A raised exception triggers the node's internal retry mechanism (`max_retries`) — there is no flow-level routing loop between nodes.
 
 ```mermaid
 graph TD
-    S(["Start"]) --> G["GenerateNode\nLLM produces JSON output"]
-    G -->|default| V["ValidateNode\nCheck schema / types"]
-    V -->|valid| F["FormatNode\nReturn structured result"]
-    V -->|invalid| G
-    F --> End(["End"])
+    Start(["Start"]) --> N["GenerateAndValidateNode\nNode(max_retries=3)\n─────────────────\nexec():\n  raw = call_llm(prompt)\n  result = parse_json(raw)\n  assert validate_schema(result)\n  return result"]
+    N -->|success on valid output| End(["End\nstructured result in shared store"])
+    N -->|exception on invalid output| Retry["Internal Retry\ncur_retry += 1\nre-runs exec()"]
+    Retry --> N
+    Retry -->|retries exhausted| Fallback["exec_fallback()\ndegrades gracefully"]
 
-    SS[("Shared Store\n{prompt, raw_output,\nparsed_output, errors}")] <-->|read/write| G & V & F
-
-    style V fill:#fce4ec,stroke:#c62828
-    style SS fill:#f9a825,stroke:#e65100,color:#000
+    style N fill:#e3f2fd,stroke:#1565c0
+    style Retry fill:#fce4ec,stroke:#c62828
 ```
 
 #### Multi-Agent
 
-Specialist sub-flows act as independent agents, each with focused responsibilities. They share a single parent store, enabling loose coordination without direct coupling.
+Each agent is an `AsyncNode` with a **self-loop** (`"continue" >> self`). Agents communicate exclusively through `asyncio.Queue` objects stored in the shared store. Both agents run concurrently via `asyncio.gather()` — there is no central coordinator.
 
 ```mermaid
 graph TD
-    subgraph ParentFlow["Parent Flow (Coordinator)"]
-        C["CoordinatorNode\nDecomposes task,\nroutes to agents"]
+    subgraph Concurrent["asyncio.gather() — runs both agents concurrently"]
+        subgraph AgentA["Hinter (AsyncNode)"]
+            H["HinterNode\nprep_async: recv from guesser_queue\nexec_async: LLM generates hint\npost_async: put hint in hinter_queue"]
+            H -->|continue| H
+        end
+
+        subgraph AgentB["Guesser (AsyncNode)"]
+            G["GuesserNode\nprep_async: recv from hinter_queue\nexec_async: LLM makes a guess\npost_async: put guess in guesser_queue"]
+            G -->|continue| G
+        end
     end
 
-    subgraph AgentA["Research Agent (Sub-Flow)"]
-        A1["SearchNode"] -->|default| A2["SummariseNode"]
-    end
+    SS[("Shared Store\n{target_word,\nforbidden_words,\nhinter_queue: asyncio.Queue,\nguesser_queue: asyncio.Queue}")] <-->|read/write| H
+    SS <-->|read/write| G
 
-    subgraph AgentB["Writing Agent (Sub-Flow)"]
-        B1["DraftNode"] -->|default| B2["EditNode"]
-    end
-
-    subgraph AgentC["Review Agent (Sub-Flow)"]
-        R1["CritiqueNode"] -->|default| R2["ScoreNode"]
-    end
-
-    C -->|research| AgentA
-    C -->|write| AgentB
-    C -->|review| AgentC
-
-    SS[("Shared Store\n{task, research,\ndraft, score}")] <-->|read/write| C & AgentA & AgentB & AgentC
-
-    style ParentFlow fill:#e8f5e9,stroke:#2e7d32
-    style AgentA fill:#e3f2fd,stroke:#1565c0
-    style AgentB fill:#fff3e0,stroke:#e65100
-    style AgentC fill:#fce4ec,stroke:#c62828
     style SS fill:#f9a825,stroke:#e65100,color:#000
+    style AgentA fill:#e3f2fd,stroke:#1565c0
+    style AgentB fill:#fce4ec,stroke:#c62828
 ```
 
 ### 9.5 Pattern Summary
