@@ -850,6 +850,139 @@ sequenceDiagram
 | **Structured Output** | Generate → validate → retry loop | GenerateNode, ValidateNode | Extracting typed data from text |
 | **Multi-Agent** | Sub-flows as specialist agents sharing a parent store | Nested `Flow` instances | Complex tasks requiring specialised roles |
 
+#### Agent
+
+The agent loop is driven by a central **DecisionNode** that calls the LLM, interprets its output as an action, and routes to the appropriate tool node. The loop continues until the LLM returns `"done"`.
+
+```mermaid
+graph TD
+    Start(["Start"]) --> D["DecisionNode\nLLM decides next action"]
+    D -->|search| S["SearchNode\nCall search API"]
+    D -->|calculate| C["CalculatorNode\nRun computation"]
+    D -->|respond| R["RespondNode\nFormat final answer"]
+    D -->|done| End(["End"])
+    S -->|loop| D
+    C -->|loop| D
+    R -->|loop| D
+
+    SS[("Shared Store\n{query, history,\nresult}")] <-->|read/write| D
+    SS <-->|read/write| S
+    SS <-->|read/write| C
+    SS <-->|read/write| R
+
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+    style D fill:#e3f2fd,stroke:#1565c0
+```
+
+#### Workflow
+
+A sequential chain of specialised nodes, each reading from and writing to the shared store. No branching — ideal for deterministic multi-step pipelines.
+
+```mermaid
+graph LR
+    A["ExtractNode\nParse input"] -->|default| B["TransformNode\nProcess data"]
+    B -->|default| C["EnrichNode\nAugment with LLM"]
+    C -->|default| D["FormatNode\nProduce output"]
+
+    SS[("Shared Store")] <-->|read/write| A & B & C & D
+
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+```
+
+#### RAG (Retrieval-Augmented Generation)
+
+Two separate flows: an **offline indexing flow** that builds the vector index, and an **online query flow** that retrieves context and generates an answer.
+
+```mermaid
+graph TD
+    subgraph Offline["Offline — Indexing Flow"]
+        O1["LoadDocsNode\nLoad source documents"] -->|default| O2["ChunkNode\nSplit into chunks"]
+        O2 -->|default| O3["EmbedNode\nEmbed via LLM API"]
+        O3 -->|default| O4["StoreNode\nSave to vector DB"]
+    end
+
+    subgraph Online["Online — Query Flow"]
+        Q1["EmbedQueryNode\nEmbed user query"] -->|default| Q2["RetrieveNode\nTop-K from vector DB"]
+        Q2 -->|default| Q3["GenerateNode\nLLM answer with context"]
+        Q3 -->|default| Q4["RespondNode\nReturn to user"]
+    end
+
+    O4 -. "vector DB" .-> Q2
+
+    style Offline fill:#e8f5e9,stroke:#2e7d32
+    style Online fill:#e3f2fd,stroke:#1565c0
+```
+
+#### Map-Reduce
+
+A `BatchNode` fans out `exec()` over each item in parallel batches, then a dedicated **ReduceNode** aggregates all results into a single output.
+
+```mermaid
+graph TD
+    IN["InputNode\nLoad N documents"] -->|default| MAP["BatchNode\nmap: summarise each doc\nexec runs N times"]
+    MAP -->|default| RED["ReduceNode\nreduce: merge N summaries\ninto final report"]
+    RED -->|default| OUT["OutputNode\nWrite final report"]
+
+    SS[("Shared Store\n{docs[ ], summaries[ ],\nfinal_report}")] <-->|read/write| IN & MAP & RED & OUT
+
+    style MAP fill:#e3f2fd,stroke:#1565c0
+    style RED fill:#fce4ec,stroke:#c62828
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+```
+
+#### Structured Output
+
+A generate–validate–retry loop ensures the LLM output conforms to a required schema. The `ValidateNode` routes back to `GenerateNode` on failure, up to `max_retries`.
+
+```mermaid
+graph TD
+    S(["Start"]) --> G["GenerateNode\nLLM produces JSON output"]
+    G -->|default| V["ValidateNode\nCheck schema / types"]
+    V -->|valid| F["FormatNode\nReturn structured result"]
+    V -->|invalid| G
+    F --> End(["End"])
+
+    SS[("Shared Store\n{prompt, raw_output,\nparsed_output, errors}")] <-->|read/write| G & V & F
+
+    style V fill:#fce4ec,stroke:#c62828
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+```
+
+#### Multi-Agent
+
+Specialist sub-flows act as independent agents, each with focused responsibilities. They share a single parent store, enabling loose coordination without direct coupling.
+
+```mermaid
+graph TD
+    subgraph ParentFlow["Parent Flow (Coordinator)"]
+        C["CoordinatorNode\nDecomposes task,\nroutes to agents"]
+    end
+
+    subgraph AgentA["Research Agent (Sub-Flow)"]
+        A1["SearchNode"] -->|default| A2["SummariseNode"]
+    end
+
+    subgraph AgentB["Writing Agent (Sub-Flow)"]
+        B1["DraftNode"] -->|default| B2["EditNode"]
+    end
+
+    subgraph AgentC["Review Agent (Sub-Flow)"]
+        R1["CritiqueNode"] -->|default| R2["ScoreNode"]
+    end
+
+    C -->|research| AgentA
+    C -->|write| AgentB
+    C -->|review| AgentC
+
+    SS[("Shared Store\n{task, research,\ndraft, score}")] <-->|read/write| C & AgentA & AgentB & AgentC
+
+    style ParentFlow fill:#e8f5e9,stroke:#2e7d32
+    style AgentA fill:#e3f2fd,stroke:#1565c0
+    style AgentB fill:#fff3e0,stroke:#e65100
+    style AgentC fill:#fce4ec,stroke:#c62828
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+```
+
 ### 9.5 Pattern Summary
 
 ```mermaid
