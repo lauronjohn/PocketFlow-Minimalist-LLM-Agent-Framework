@@ -183,35 +183,272 @@ This PocketFlow Context View shows PocketFlow as the central system and the exte
 
 ### 4.1 Repository Structure
 
-> _To be completed — Week 3_
+Applications built with PocketFlow follow a strict convention:
+
+```
+my_project/
+├── main.py              # Entry point, initializes shared store
+├── nodes.py             # All Node class definitions
+├── flow.py              # Flow creation and orchestration
+├── utils/               # External utility functions (LLM, APIs)
+└── docs/
+    └── design.md        # Design document (source of truth)
+```
+
+The `docs/design.md` file serves as the central source of truth for the application's data schemas, flow design, and node specifications. This convention is intentionally lightweight to match the framework's minimalist philosophy.
 
 ### 4.2 Module Structure
 
-> _To be completed — Week 3_
+The PocketFlow framework follows an ultra-minimalist architecture with the core contained entirely within a single 100-line file `pocketflow/__init__.py`. The core consists of five main classes:
+
+| Class | Responsibility |
+|---|---|
+| **BaseNode** | Defines the three-phase lifecycle pattern (`prep → exec → post`) |
+| **Node** | Standard node with retry logic and fallback mechanisms |
+| **BatchNode** | For data-intensive collection processing |
+| **AsyncNode** | For non-blocking asynchronous operations |
+| **Flow** | Orchestrates nodes through action-based routing using the `>>` operator |
+
+All nodes communicate through a **Shared Store** — a shared dictionary that serves as the data contract between nodes within a Flow.
 
 ### 4.3 Core Abstraction
 
-> _To be completed — Week 3_
+PocketFlow's core abstraction is a **nested directed graph with a shared store**. This means:
+
+- **Nodes** are the vertices of the graph. Each node encapsulates a single unit of work.
+- **Actions** are the labeled edges. A node returns a string action that determines which successor node runs next.
+- **Flows** are themselves nodes, enabling nested graph structures.
+- The **Shared Store** is a plain Python dictionary passed between nodes, enabling loose coupling.
+
+This graph model is sufficiently expressive to implement agents, workflows, RAG pipelines, MapReduce patterns, and multi-agent systems — all without extending the 100-line core.
 
 ### 4.4 Node Lifecycle
 
-> _To be completed — Week 3_
+Every node in PocketFlow follows a strict three-phase lifecycle defined by `BaseNode`:
+
+1. **Prep** — Read and serialize data from the shared store. Prepare inputs for execution.
+2. **Exec** — Perform the core computation in isolation from the shared store. This phase is designed to be idempotent, enabling safe retries.
+3. **Post** — Write results back to the shared store and return an action string that determines the next node in the flow.
+
+This separation of concerns improves testability: the `exec` method can be unit-tested independently because it does not depend on global state.
+
+### 4.5 Dependencies and Technology Stack
+
+**Core Framework Dependencies:** Zero external dependencies. The framework imports only Python standard library modules (`typing`, `abc`, `asyncio`).
+
+**Application Dependencies:** Users control their own dependencies through utility functions. For example, a typical `requirements.txt` might include:
+
+```
+PyYAML
+pocketflow
+```
+
+Vendor-specific integrations (OpenAI, Anthropic, vector databases) are implemented by users in the `utils/` directory rather than being bundled with the framework.
+
+### 4.6 Development Process: Agentic Coding Methodology
+
+PocketFlow employs a distinctive eight-step development process that divides responsibilities between humans and AI agents:
+
+| Step | Human Involvement | AI Involvement | Primary Artifact |
+|------|------------------|----------------|------------------|
+| 1. Requirements | ★★★ High | ★☆☆ Low | `docs/design.md` |
+| 2. Flow Design | ★★☆ Medium | ★★☆ Medium | `docs/design.md` |
+| 3. Utilities | ★★☆ Medium | ★★☆ Medium | `utils/*.py` |
+| 4. Data Design | ★☆☆ Low | ★★★ High | `docs/design.md` |
+| 5. Node Design | ★☆☆ Low | ★★★ High | `docs/design.md` |
+| 6. Implementation | ★☆☆ Low | ★★★ High | `flow.py`, `nodes.py`, `main.py` |
+| 7. Optimization | ★★☆ Medium | ★★☆ Medium | Prompt refinement, flow redesign |
+| 8. Reliability | ★☆☆ Low | ★★★ High | Test cases, retry configuration |
+
+The methodology is built on the principle that *"If Humans can't specify the flow, AI Agents can't automate it!"*
+
+This division is enabled by the framework's minimal abstractions, which are simple enough for AI agents to understand completely.
+
+### 4.7 Key Development Constraints and Principles
+
+**Three Zeros Philosophy**:
+
+- **Zero Bloat**: Core framework limited to exactly 100 lines
+- **Zero Dependencies**: No external Python packages required
+- **Zero Vendor Lock-in**: Users implement their own utility functions
+
+**Documentation-First Policy**: AI agents are instructed to always request and review MDC documentation files before writing code.
+
+**Shared Store Contract**: All nodes communicate through a well-designed shared dictionary that serves as a data contract.
+
+### 4.8 Build and Deployment
+
+The framework has minimal build requirements:
+
+- Simple `pip` installation from the package
+- No complex build processes or compilation steps
+- Designed for portability across programming languages (TypeScript, Java, C++, etc.)
 
 ---
 
 ## 5. Process View
 
-### 5.1 Synchronous Execution
+### 5.1 Runtime Structure and Execution Model
 
-> _To be completed — Week 4_
+PocketFlow operates as a graph-based execution engine where Nodes are the fundamental units of work and Flows orchestrate their execution through action-based routing. The system follows a strict three-phase lifecycle for each node.
 
-### 5.2 Asynchronous Execution
+The Shared Store serves as the central state management mechanism, functioning like a heap that all nodes can access. This separates data schema from compute logic, enabling nodes to communicate without direct coupling.
 
-> _To be completed — Week 4_
+#### System Architecture Overview
 
-### 5.3 Batch Execution
+```mermaid
+graph TD
+    %% Shared Store Node
+    subgraph Storage [State Management]
+        SharedStore[("Shared Store<br>(Global Dictionary / Data Contract)")]
+    end
 
-> _To be completed — Week 4_
+    %% Flow Orchestrator and Nodes
+    subgraph FlowOrchestrator [Flow Orchestrator: _orch loop]
+        NodeA["Node A<br>(prep/exec/post)"]
+        NodeB["Node B<br>(prep/exec/post)"]
+        SubFlow["Sub-Flow (Nested Node)<br>(Orchestration Only)"]
+
+        NodeA -->|'"default"'| NodeB
+        NodeB -->|'"retry"'| NodeA
+        NodeA -->|'"approve"'| SubFlow
+    end
+
+    %% Communication Links
+    NodeA <-->|Reads / Writes| SharedStore
+    NodeB <-->|Reads / Writes| SharedStore
+    SubFlow <-->|Reads / Writes| SharedStore
+
+    %% Styling
+    style SharedStore fill:#f9f,stroke:#333,stroke-width:2px
+    style FlowOrchestrator fill:#f5f5f5,stroke:#666,stroke-dasharray: 5 5
+```
+
+### 5.2 Node Execution Lifecycle
+
+Each node executes through three distinct phases:
+
+1. **`prep(shared)`** — Reads and preprocesses data from the shared store, returning `prep_res` for the next phase.
+2. **`exec(prep_res)`** — Performs compute logic (LLM calls, API requests) with optional retry logic, isolated from the shared store.
+3. **`post(shared, prep_res, exec_res)`** — Writes results back to the shared store and returns an Action string for routing.
+
+This separation ensures idempotency for retries and clean separation between data access and computation.
+
+#### Phase Isolation & Fault Tolerance Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Store as Shared Store
+    participant Node as PocketFlow Node Engine
+    participant Ext as External Service / LLM
+
+    Note over Node: Phase 1: prep()
+    Node->>Store: prep(shared) - Read state
+    Store-->>Node: return prep_res
+
+    Note over Node: Phase 2: exec() <br>(Isolated from Shared Store)
+    loop Retry Loop (up to max_retries)
+        Node->>Ext: exec(prep_res) - LLM / API Request
+        alt Success
+            Ext-->>Node: return exec_res
+        else Error / Exception
+            Ext-->>Node: Throw Exception (Increment cur_retry)
+            Note over Node: If exhausted: trigger exec_fallback()
+        end
+    end
+
+    Note over Node: Phase 3: post()
+    Node->>Store: post(shared, prep_res, exec_res) - Write results
+    Node->>Node: Return Action String (e.g., "default", "success")
+```
+
+### 5.3 Flow Orchestration and Control Flow
+
+The `Flow` class manages runtime execution through an internal orchestrator (`_orch`) that loops through nodes based on returned actions:
+
+```python
+def _orch(self, shared, params=None):
+    curr, p, last_action = copy.copy(self.start_node), (params or {**self.params}), None
+    while curr:
+        curr.set_params(p)
+        last_action = curr._run(shared)
+        curr = copy.copy(self.get_next_node(curr, last_action))
+    return last_action
+```
+
+Action-based routing enables dynamic control flow:
+
+- **Default transition:** `node_a >> node_b` (if `post()` returns `"default"`)
+- **Named action:** `node_a - "action_name" >> node_b` (if `post()` returns `"action_name"`)
+
+This supports branching, looping, and complex workflows like expense approval with multiple outcomes.
+
+### 5.4 Communication Patterns
+
+Nodes communicate through two primary mechanisms:
+
+- **Shared Store** — Global dictionary for data results, large content, and state shared across nodes.
+- **Params** — Local, ephemeral dictionaries passed by parent Flows, used as task identifiers in Batch mode.
+
+The shared store acts as a data contract that all nodes agree upon, designed ahead of time based on application requirements.
+
+### 5.5 Concurrency Patterns
+
+PocketFlow provides multiple concurrency models for different use cases.
+
+#### Async Execution
+
+`AsyncNode` implements async versions of the lifecycle methods (`prep_async`, `exec_async`, `post_async`) for I/O-bound tasks. This is useful for:
+
+- Fetching/reading data asynchronously
+- Async LLM calls
+- Awaiting user feedback or multi-agent coordination
+
+#### Batch Processing & Parallel Execution
+
+- **BatchNode:** Processes collections by iterating over items returned from `prep()`. `exec(item)` is called once per item, and `post()` receives a combined list of results.
+- **AsyncParallelBatchNode:** Uses `asyncio.gather` to execute multiple `exec_async` calls concurrently. This optimizes I/O-bound tasks like simultaneous LLM requests but requires careful handling of rate limits.
+
+```mermaid
+graph TD
+    subgraph BatchNode [Standard Batch Processing]
+        B_prep[prep: returns List/Generator] --> B_loop{For each item}
+        B_loop -->|Sequential| B_exec1[exec item 1]
+        B_exec1 --> B_exec2[exec item 2]
+        B_exec2 --> B_post[post: receives List of results]
+    end
+
+    subgraph AsyncParallelBatchNode [Parallel Batch Processing]
+        P_prep[prep: returns List/Generator] --> P_gather[asyncio.gather]
+        P_gather --> P_exec1[exec_async item 1]
+        P_gather --> P_exec2[exec_async item 2]
+        P_gather --> P_exec3[exec_async item 3]
+        P_exec1 & P_exec2 & P_exec3 --> P_post[post_async: receives List of results]
+    end
+```
+
+### 5.6 Error Handling and Fault Tolerance
+
+Nodes implement built-in retry logic with configurable parameters:
+
+| Parameter | Description | Default |
+|---|---|---|
+| `max_retries` | Maximum number of execution attempts | `1` |
+| `wait` | Seconds to wait between retries | `0` |
+| `exec_fallback` | Called when all retries are exhausted | — |
+
+The retry mechanism automatically handles exceptions in `exec()`, with the current retry count accessible via `self.cur_retry`.
+
+### 5.7 Nested Flow Composition
+
+Flows can act as Nodes, enabling powerful composition patterns:
+
+- Sub-flows can be used as nodes within parent flows.
+- Node params merge from all parent flows.
+- Flows run `prep()` and `post()` but not `exec()` (their internal logic *is* orchestration).
+
+This enables hierarchical workflows like order processing pipelines with separate payment, inventory, and shipping sub-flows.
 
 ---
 
@@ -353,67 +590,139 @@ This section documents PocketFlow's key architecture design decisions using the 
 
 ## 7. Design Patterns
 
-### 7.1 Agent Pattern
+PocketFlow uses a Graph-based core abstraction as its foundational architecture pattern, with several higher-level design patterns built on top of it.
 
-> _To be completed — Week 5_
+### 7.1 Core Architecture Pattern: Graph + Shared Store
 
-### 7.2 Workflow Pattern
+The fundamental architecture pattern is a directed graph where:
 
-> _To be completed — Week 5_
+- **Nodes** represent units of work (LLM tasks, API calls)
+- **Flows** orchestrate nodes through action-based routing
+- **Shared Store** enables communication between nodes without direct coupling
 
-### 7.3 RAG Pattern
+This pattern enforces separation of concerns through a three-phase node lifecycle (`prep` → `exec` → `post`) that separates data access from compute logic.
 
-> _To be completed — Week 5_
+### 7.2 Agent Pattern
 
-### 7.4 MapReduce Pattern
+Nodes can take dynamic actions based on context, using branching to connect action nodes to an agent node that decides the next action. The agent node provides a prompt to decide actions from a defined action space.
 
-> _To be completed — Week 5_
+### 7.3 Workflow Pattern
+
+Chains multiple tasks into sequential pipelines, useful for multi-step processes like writing workflows that outline, write content, and apply styling.
+
+### 7.4 RAG Pattern
+
+Integrates data retrieval with generation, typically involving offline (indexing) and online (retrieval) workflows.
+
+### 7.5 Map-Reduce Pattern
+
+Splits data tasks into Map (processing items in parallel/sequence) and Reduce (aggregating results) steps.
+
+### 7.6 Structured Output Pattern
+
+Formats outputs consistently, useful for extracting structured data from unstructured inputs.
+
+### 7.7 Multi-Agent Pattern
+
+Coordinates multiple agents for complex tasks requiring specialized roles.
+
+### 7.8 Concurrency Patterns
+
+PocketFlow provides multiple concurrency models for different use cases.
+
+#### Batch Processing
+
+`BatchNode` processes collections by iterating over items, with `prep()` returning an iterable and `exec()` called once per item.
+
+#### Async Processing
+
+`AsyncNode` implements async versions of lifecycle methods for I/O-bound tasks like async LLM calls.
+
+#### Parallel Processing
+
+`AsyncParallelBatchNode` uses `asyncio.gather` to execute multiple `exec_async` calls concurrently for I/O-bound tasks.
 
 ---
 
 ## 8. Quality Attribute Scenarios
 
-### 8.1 Modifiability
+### 8.1 Performance — Parallel LLM Execution
 
-> _To be completed — Week 6_
+**Scenario:** When a user needs to process multiple documents simultaneously (stimulus), during normal operation (environment), the `AsyncParallelBatchNode` (artifact) executes multiple LLM calls concurrently using `asyncio.gather` (response), achieving up to 3x speedup compared to sequential processing (response measure).
 
-### 8.2 Performance
+### 8.2 Reliability — Transient API Failures
 
-> _To be completed — Week 6_
+**Scenario:** When an LLM API call fails due to rate limits or network issues (stimulus), during normal operation (environment), a `Node` with `max_retries=3` and `wait=10` (artifact) automatically retries the operation with exponential backoff (response), succeeding within 3 attempts or calling `exec_fallback` (response measure).
 
-### 8.3 Portability
+### 8.3 Modifiability — Vendor Switching
 
-> _To be completed — Week 6_
+**Scenario:** When a developer wants to switch from OpenAI to Anthropic (stimulus), during development (environment), the utility function architecture (artifact) allows replacing `call_llm.py` without modifying core framework code (response), requiring changes only in the `utils/` directory (response measure).
 
-### 8.4 Testability
+### 8.4 Usability — AI-Assisted Development
 
-> _To be completed — Week 6_
+**Scenario:** When a developer uses Cursor AI to implement a workflow (stimulus), during development (environment), the Agentic Coding methodology and 100-line core (artifact) enables the AI to understand and implement the complete flow from natural language specification (response), achieving a 10x productivity boost (response measure).
 
-### 8.5 Extensibility
+### 8.5 Portability — Cross-Language Deployment
 
-> _To be completed — Week 6_
+**Scenario:** When a team needs to deploy the same workflow in different technology stacks (stimulus), during deployment (environment), the core Graph abstraction (artifact) has been ported to TypeScript, Java, C++, Go, Rust, and PHP (response), maintaining identical behavior across languages (response measure).
+
+### 8.6 Maintainability — Separation of Concerns
+
+**Scenario:** When a developer needs to debug a data processing issue (stimulus), during maintenance (environment), the three-phase node lifecycle (artifact) isolates data access in `prep()`/`post()` from compute logic in `exec()` (response), allowing debugging without affecting other phases (response measure).
+
+### 8.7 Availability — Graceful Degradation
+
+**Scenario:** When a critical LLM service becomes unavailable (stimulus), during production operation (environment), the `exec_fallback` mechanism (artifact) returns a fallback result instead of crashing (response), allowing the workflow to continue with degraded functionality (response measure).
+
+PocketFlow's quality attributes are deliberately designed around its minimalist philosophy. The framework prioritizes modifiability and usability through zero vendor lock-in and the Agentic Coding methodology, while providing reliability through built-in retry mechanisms. Performance is addressed through async/parallel patterns for I/O-bound tasks rather than CPU optimization. The separation of concerns in the node lifecycle enhances maintainability, and the simple core abstraction enables portability across multiple programming languages.
 
 ---
 
 ## 9. Technical Debt Analysis
 
-### 9.1 Intentional Trade-offs
+PocketFlow's technical debt is primarily intentional design trade-offs that align with its minimalist philosophy. The framework deliberately transfers implementation burden to users (**Project Debt**) in exchange for simplicity, flexibility, and zero vendor lock-in. **Design Debt** represents architectural constraints that enable portability and AI-assisted development. **Documentation Debt** is the cost of the Documentation First Policy that enables Agentic Coding. **Test Debt** reflects the framework's opinionated stance on not providing built-in testing utilities.
 
-> _To be completed — Week 7_
+### 9.1 Design Debt
 
-### 9.2 Identified Structural Risks
+**100-Line Core Constraint:** The framework is constrained to exactly 100 lines in `pocketflow/__init__.py`, limiting comprehensive type annotations, advanced error handling, built-in validation, and extensive inline documentation. This is an intentional architectural constraint for portability.
 
-> _To be completed — Week 7_
+**No Built-in Utilities:** Users must implement all vendor-specific integrations (LLM wrappers, web search, vector databases) themselves, creating implementation burden and potential for inconsistent patterns. This avoids vendor lock-in and API volatility maintenance.
 
-### 9.3 Comparison to Competitors
+**Zero External Dependencies:** The framework imports only Python standard library modules, limiting use of established libraries, ecosystem integration, and optimized implementations. This eliminates dependency hell and supply chain vulnerabilities.
 
-> _To be completed — Week 7_
+**Minimal Abstraction Layer:** Only provides Graph abstraction without high-level patterns like Agent, Chain, or QA helpers, requiring users to compose design patterns themselves. This keeps the core minimal and flexible.
+
+**Shared Store Scalability:** The shared store pattern uses a simple in-memory dictionary for inter-node communication, which may lead to inconsistent data access patterns, no built-in transaction support, and potential race conditions in concurrent scenarios.
+
+**Type Safety Limitations:** The 100-line constraint likely limits comprehensive type hints in the core implementation, potentially lacking runtime type checking, generic type constraints, and comprehensive IDE support.
+
+**Error Handling Complexity:** Built-in retry mechanism is basic (`max_retries`, `wait`, `exec_fallback`), requiring custom fallback implementations, manual circuit breaker patterns, and no built-in dead letter queues for complex scenarios.
+
+### 9.2 Documentation Debt
+
+**Documentation Maintenance:** The "Documentation First Policy" requires AI agents to request and review MDC files before coding, creating documentation overhead, potential drift between docs and implementation, and maintenance burden for keeping MDC files synchronized. This is intentional to support the Agentic Coding methodology.
+
+### 9.3 Test Debt
+
+**No Built-in Testing Framework:** The framework provides no built-in testing framework or mocking utilities. Users must implement their own test strategies, which could lead to inconsistent testing patterns, no standardized way to test flows, and difficulty testing async/parallel scenarios. The Agentic Coding methodology includes AI writing test cases as a reliability step.
+
+### 9.4 Project Debt
+
+**Vendor Integrations:** Users must implement LLM, vector DB, and search APIs themselves, transferring implementation burden to avoid vendor lock-in.
+
+**Design Patterns:** Users must compose Agent, RAG, and Workflow patterns themselves rather than using built-in features, transferring implementation burden to keep the core minimal.
+
+**State Management:** Users must design shared store schema and persistence themselves, transferring implementation burden for flexibility across different use cases.
+
+**Error Handling:** Users must implement complex fallback strategies themselves, transferring implementation burden while the framework provides basic retry mechanisms.
+
+**Testing Infrastructure:** Users must implement test infrastructure themselves, transferring implementation burden as the framework takes no opinionated testing approach.
 
 ---
 
 ## 10. Conclusion
 
-> _To be completed — Week 8_
+Using the Rozanski and Woods framework, PocketFlow's architecture is best understood through what it deliberately excludes rather than what it provides. Its stakeholders—ranging from the solo lead maintainer and contributors to LLM developers and AI researchers—are served by a minimal orchestration core that avoids vendor wrappers, external APIs, and heavy dependencies, relying solely on the Python standard library. The development view reveals this minimalism in a single 100-line file, strict project conventions, and an agentic coding methodology that splits design between humans and AI. However, this stance creates intentional technical debt: users must build their own utilities, testing infrastructure, and error-handling strategies. Despite this, the architecture delivers strong modifiability, reliability, performance, and portability. In conclusion, PocketFlow is an elegant and coherent framework for LLM orchestration, but it would benefit from clearer guidance on testing and shared-store schema management to reduce the burden on users.
 
 ---
 
@@ -428,28 +737,24 @@ This section documents PocketFlow's key architecture design decisions using the 
 - [ Context View ] 
 
 ### Week 3
-- [ Architecture Design Decisions ] 
-- [ Design Decision Relationship Graph ] 
+- [ Architecture Design Decisions ]
+- [ Design Decision Relationship Graph ]
+- [ Development View ]
 
 ### Week 4
-- [ ] 
-- [ ] 
+- [ Process View ]
 
 ### Week 5
-- [ ] 
-- [ ] 
+- [ Design Patterns ]
 
 ### Week 6 — Midterm
-- [ ] 
-- [ ] 
+- [ Quality Attribute Scenarios ]
 
 ### Week 7
-- [ ] 
-- [ ] 
+- [ Technical Debt Analysis ]
 
 ### Week 8 — Final
-- [ ] 
-- [ ] 
+- [ Conclusion ] 
 
 ---
 
