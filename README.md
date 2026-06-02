@@ -269,7 +269,7 @@ classDiagram
 | `AsyncBatchNode` | Sequential async batch | Multiple inheritance from `AsyncNode` + `BatchNode`; async sequential iteration |
 | `AsyncParallelBatchNode` | Parallel async batch | Multiple inheritance from `AsyncNode` + `BatchNode`; concurrent execution via `asyncio.gather` |
 | `Flow` | Orchestrator | Runs the `_orch` loop; is itself a `BaseNode`, enabling nesting |
-| `BatchFlow` | Batch flow orchestrator | Runs the entire flow once per item in a batch |
+| `BatchFlow` | Batch flow orchestrator | Executes the flow multiple times with different parameter sets returned by `prep()` |
 | `AsyncFlow` | Async orchestrator | Multiple inheritance from `Flow` + `AsyncNode`; async `_orch_async` loop |
 | `AsyncBatchFlow` | Async batch flow | Multiple inheritance from `AsyncFlow` + `BatchFlow`; async batch orchestration |
 | `AsyncParallelBatchFlow` | Parallel async batch flow | Multiple inheritance from `AsyncFlow` + `BatchFlow`; parallel async batch orchestration |
@@ -371,9 +371,7 @@ Every node follows a strict three-phase lifecycle defined by `BaseNode`:
 **Core Framework Dependencies:** Zero. Imports only Python standard library:
 
 ```python
-import copy, asyncio
-from abc import ABC, abstractmethod
-from typing import Any, Optional
+import asyncio, warnings, copy, time
 ```
 
 **Application Dependencies:** Fully user-controlled. Typical `requirements.txt`:
@@ -494,7 +492,7 @@ def _orch(self, shared, params=None):
 
 | Routing Type | Syntax | Trigger |
 |---|---|---|
-| **Default transition** | `node_a >> node_b` | `post()` returns `"default"` |
+| **Default transition** | `node_a >> node_b` | `post()` returns `None` or `"default"` |
 | **Named action** | `node_a - "approve" >> node_b` | `post()` returns `"approve"` |
 | **Loop** | `node_a - "retry" >> node_a` | `post()` returns `"retry"` |
 | **Terminal** | No successor defined | Any unmatched action string |
@@ -533,7 +531,6 @@ graph TD
 | `max_retries` | Maximum execution attempts | `1` |
 | `wait` | Seconds between retry attempts | `0` |
 | `exec_fallback(prep_res, exc)` | Called when all retries are exhausted | Raises exception |
-| `cur_retry` | Current retry count, accessible inside `exec` | `0` |
 
 ### 6.7 Nested Flow Composition
 
@@ -599,7 +596,7 @@ Consistent re-implementation across six language paradigms is strong evidence th
 
 ## 8. Architecture Design Decisions
 
-This section documents PocketFlow's key architecture design decisions using the **Tyree & Ackerman (2005)** template as taught in the course: Issue, Importance, Decision, Status, Group, Assumptions, Alternatives, Arguments, Implications, and Possible negative impact on quality.
+This section documents the key design decisions that shaped PocketFlow. Each decision is described using a structured template (Tyree & Ackerman, 2005): what problem it addresses, why it matters, what was decided, what alternatives were considered, the trade-offs involved, and what could go wrong.
 
 ### 8.1 Decision Overview
 
@@ -622,11 +619,11 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | Keep core to exactly 100 lines with zero external dependencies |
 | **Status** | Accepted |
 | **Group** | Core Architecture |
-| **Assumptions** | Complex patterns can be composed from simple primitives; developers prefer flexibility over convenience |
+| **Assumptions** | Complex patterns can be built from simple building blocks; developers value flexibility over built-in convenience |
 | **Alternatives** | Full-featured frameworks: LangChain (405K lines), CrewAI (18K lines) |
-| **Arguments** | **Pros:** Eliminates vendor lock-in; makes the framework fully auditable; forces ruthless prioritisation; uniquely suitable for agentic coding.<br>**Cons:** Fewer ready-made features; shifts implementation burden to users; steeper initial learning curve.<br>**Summary:** Minimalism wins on auditability and portability, but shifts implementation work onto users. |
-| **Implications** | Users must implement their own utility functions; cookbook examples become essential documentation |
-| **Possible negative quality impact** | Higher barrier to entry; more boilerplate for simple applications |
+| **Arguments** | **Pros:** No vendor lock-in; the entire framework can be read and understood in minutes; forces focus on what truly matters; easy for AI coding tools to work with.<br>**Cons:** Fewer out-of-the-box features; more setup work for users; steeper initial learning curve.<br>**Summary:** Minimalism wins on auditability and portability, but shifts implementation work onto users. |
+| **Implications** | Users must write their own helper functions; the cookbook examples become the main form of documentation |
+| **Possible negative quality impact** | Higher barrier to entry for beginners; more repetitive code for simple use cases |
 
 ### 8.3 ADD-02: Graph + Shared Store Abstraction
 
@@ -637,11 +634,11 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | Model workflows as a directed graph (nodes + labeled edges) + Shared Store (central state) |
 | **Status** | Accepted |
 | **Group** | Core Architecture |
-| **Assumptions** | Most LLM workflows can be modelled as directed graphs; state management is a cross-cutting concern |
+| **Assumptions** | Most LLM workflows can be drawn as a diagram of steps and decisions; shared state needs to be accessible to all steps |
 | **Alternatives** | Chain-based (linear only), pure agent-based, pipeline-based |
-| **Arguments** | **Pros:** More flexible than chains; simpler than full agent systems; supports loops, branching, and conditionals.<br>**Cons:** Requires explicit graph modelling; large workflows need supporting diagrams.<br>**Summary:** The graph model offers the right balance between expressiveness and simplicity, at the cost of requiring upfront design work. |
-| **Implications** | All workflows must be expressible as graphs; shared store schema becomes a critical design artifact |
-| **Possible negative quality impact** | May be limiting for workflows that resist graph decomposition |
+| **Arguments** | **Pros:** More flexible than a simple chain; simpler than a full agent system; naturally supports loops, branching, and decisions.<br>**Cons:** Requires thinking through the workflow design upfront; complex workflows need good diagrams.<br>**Summary:** The graph model strikes the right balance between flexibility and simplicity, at the cost of requiring upfront design work. |
+| **Implications** | All workflows must be expressible as a graph of nodes; the shared store schema is a critical design artifact that must be planned first |
+| **Possible negative quality impact** | Some workflows that don't map cleanly to a graph may feel forced |
 
 ### 8.4 ADD-03: No Built-in Utility Functions
 
@@ -652,11 +649,11 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | No built-in utilities; provide cookbook examples and let users implement their own |
 | **Status** | Accepted |
 | **Group** | Framework Philosophy |
-| **Assumptions** | Vendor APIs change frequently; optimisations (prompt caching, streaming) are project-specific |
-| **Alternatives** | Comprehensive utility library (LangChain approach); basic utilities with extension points |
-| **Arguments** | **Pros:** Avoids vendor lock-in; eliminates maintenance burden from vendor API changes; enables per-project optimisations.<br>**Cons:** Increases boilerplate; less help for beginners; can lead to inconsistent patterns across projects.<br>**Summary:** Trading built-in convenience for long-term flexibility and freedom from vendor churn. |
-| **Implications** | Developers must implement their own `utils/` directory; initial setup takes longer |
-| **Possible negative quality impact** | Higher barrier to entry; beginners may implement utilities poorly |
+| **Assumptions** | LLM provider APIs change frequently; performance optimisations like prompt caching and streaming are specific to each project |
+| **Alternatives** | Build a comprehensive utility library (like LangChain); provide basic utilities with extension points |
+| **Arguments** | **Pros:** Not tied to any LLM vendor; no maintenance burden when provider APIs change; each project can optimise its own integrations.<br>**Cons:** More setup work; less guidance for beginners; each team may solve the same problems differently.<br>**Summary:** Trading built-in convenience for long-term flexibility and freedom from vendor churn. |
+| **Implications** | Developers create their own `utils/` folder for LLM calls and tools; initial setup takes more time than frameworks with built-ins |
+| **Possible negative quality impact** | Higher barrier to entry; beginners may write poor utility code without examples to follow |
 
 ### 8.5 ADD-04: Node Lifecycle Pattern (Prep–Exec–Post)
 
@@ -667,11 +664,11 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | Three-phase lifecycle: `prep()` (read from shared), `exec()` (compute, isolated), `post()` (write + route) |
 | **Status** | Accepted |
 | **Group** | Node Architecture |
-| **Assumptions** | Separation of concerns improves testability; `exec()` isolation enables safe retries |
-| **Alternatives** | Single `execute()` method with direct shared access; event-driven pattern; functional composition |
-| **Arguments** | **Pros:** Safe retries when `exec` is idempotent; clean separation of data access from computation; improves testability.<br>**Cons:** Adds structural boilerplate to simple nodes; developers must learn phase boundaries.<br>**Summary:** Phase separation is the key enabler of both reliable retries and clean unit testing, justified by a small boilerplate cost. |
-| **Implications** | All nodes must follow this pattern; some boilerplate required even for trivial operations |
-| **Possible negative quality impact** | Can feel verbose for simple transformations |
+| **Assumptions** | Splitting data access from computation makes code easier to test; keeping `exec()` isolated from shared state makes retries safe |
+| **Alternatives** | A single `execute()` method with direct access to shared state; event-driven pattern; functional composition |
+| **Arguments** | **Pros:** Retrying a failed LLM call is safe because `exec()` doesn't touch shared state; each phase is independently testable; clear boundaries reduce bugs.<br>**Cons:** Adds a bit of boilerplate even for simple nodes; developers need to learn which logic belongs in which phase.<br>**Summary:** The three-phase split is what makes reliable retries and clean testing possible — a small boilerplate cost for a significant reliability gain. |
+| **Implications** | Every node must follow this three-phase structure; even very simple nodes require all three methods |
+| **Possible negative quality impact** | Can feel overly structured for trivial one-step operations |
 
 ### 8.6 ADD-05: Action-Based Routing
 
@@ -682,11 +679,11 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | Nodes return string "actions" as routing keys to determine successor nodes |
 | **Status** | Accepted |
 | **Group** | Flow Control |
-| **Assumptions** | String-based routing is sufficient; conditional logic belongs in nodes, not in flow definition |
-| **Alternatives** | Hard-coded successor chains; boolean conditions; complex routing DSL |
-| **Arguments** | **Pros:** Enables dynamic decision-making; supports loops and branching; simple to implement and understand.<br>**Cons:** No compile-time validation of routes; consistent action naming requires discipline.<br>**Summary:** String actions give maximum routing flexibility at the cost of moving validation from compile-time to runtime. |
-| **Implications** | Flow control is decentralised to individual nodes; action naming becomes a design concern |
-| **Possible negative quality impact** | Typos in action strings cause silent routing failures |
+| **Assumptions** | Plain strings are sufficient for routing; decision logic belongs inside nodes, not in the flow wiring |
+| **Alternatives** | Hard-coded next-node references; boolean true/false conditions; a dedicated routing language |
+| **Arguments** | **Pros:** Nodes can make dynamic routing decisions at runtime; supports loops, branching, and complex control flows; easy to read and write.<br>**Cons:** No way to catch routing errors at build time; teams need to agree on naming conventions for action strings.<br>**Summary:** String-based routing gives maximum flexibility at the cost of moving error detection from build-time to runtime. |
+| **Implications** | Each node decides where the flow goes next; consistent action string naming must be agreed on across the project |
+| **Possible negative quality impact** | A typo in an action string causes the flow to silently stop instead of failing loudly |
 
 ### 8.7 ADD-06: Agentic Coding Methodology
 
@@ -697,11 +694,11 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | Humans design high-level flows and data schemas; AI agents implement specific nodes and utilities |
 | **Status** | Accepted |
 | **Group** | Development Process |
-| **Assumptions** | Humans are better at system design; AI is better at implementation details; the framework must be simple enough for AI to fully understand |
-| **Alternatives** | Fully human-driven; fully AI-driven; traditional pair programming |
-| **Arguments** | **Pros:** Leverages complementary human/AI strengths; enables rapid iteration; reduces repetitive coding.<br>**Cons:** Depends on AI code quality; requires careful human review; may not suit compliance-heavy environments.<br>**Summary:** The methodology works well when the framework is simple enough for AI to reason about, which PocketFlow's 100-line core uniquely enables. |
-| **Implications** | Requires clear design documentation upfront; humans must understand the framework well |
-| **Possible negative quality impact** | Over-reliance on AI can introduce subtle bugs if design documents are ambiguous |
+| **Assumptions** | Humans are better at high-level design decisions; AI agents are better at writing repetitive implementation code; the framework must be simple enough for AI tools to fully understand |
+| **Alternatives** | Fully human-written code; fully AI-generated code; traditional pair programming |
+| **Arguments** | **Pros:** Plays to the strengths of both humans and AI; speeds up development; reduces repetitive coding work.<br>**Cons:** AI-generated code still needs careful human review; requires clear design documents upfront; not suitable for regulated environments where all code must be human-authored.<br>**Summary:** This approach works specifically because PocketFlow's 100-line core is simple enough for AI tools to fully understand and reason about. |
+| **Implications** | Teams must write good design documentation before coding; developers need a solid understanding of the framework to review AI-generated code |
+| **Possible negative quality impact** | If the design document is vague or incomplete, AI agents may generate code that looks correct but has subtle logical errors |
 
 ### 8.8 ADD-07: Shared Store as Data Contract
 
@@ -712,15 +709,15 @@ This section documents PocketFlow's key architecture design decisions using the 
 | **Decision** | Use a shared dictionary designed upfront as an explicit data contract between all nodes |
 | **Status** | Accepted |
 | **Group** | State Management |
-| **Assumptions** | Dictionary-based state is sufficient; explicit schemas improve maintainability |
-| **Alternatives** | Message passing; function parameters; event bus; database-backed state |
-| **Arguments** | **Pros:** Simple and flexible; enables loose coupling; supports both in-memory and persistent implementations.<br>**Cons:** No compile-time schema enforcement; runtime errors if contract is violated; requires disciplined documentation.<br>**Summary:** A plain dictionary is the simplest possible shared state mechanism; its lack of enforcement is acceptable when the schema is designed explicitly upfront. |
-| **Implications** | Data schema design is a critical first step; `docs/design.md` is the schema source of truth |
-| **Possible negative quality impact** | Runtime `KeyError` or type errors possible when contract is not followed |
+| **Assumptions** | A plain dictionary is flexible enough to handle all inter-node data sharing; agreeing on a schema upfront prevents most runtime errors |
+| **Alternatives** | Message passing between nodes; passing data as function arguments; an event bus; a database |
+| **Arguments** | **Pros:** Simple and easy to understand; nodes are loosely coupled since they only share a dictionary; works both in-memory and with persistent storage.<br>**Cons:** No automatic enforcement of the schema; if a node writes the wrong key or type, the error only appears at runtime; requires disciplined documentation.<br>**Summary:** A plain dictionary is the simplest shared state mechanism possible; the lack of enforcement is acceptable as long as the schema is planned carefully upfront. |
+| **Implications** | Designing the shared store schema is the first step of every project; `docs/design.md` is the single source of truth for what data flows between nodes |
+| **Possible negative quality impact** | Accessing a missing key (`KeyError`) or wrong data type are the most common runtime bugs when the data contract is not followed |
 
 ### 8.9 Decision Relationships
 
-Following Kruchten, Lago & van Vliet (2006), architectural decisions are not independent — they form a network of relationships. The diagram below shows how PocketFlow's seven ADDs interact, using relationship types taught in the course (enables, requires, constrains):
+Design decisions don't exist in isolation — they depend on and shape each other (Kruchten, Lago & van Vliet, 2006). The diagram below shows how PocketFlow's seven decisions connect, using three relationship types: **enables** (makes another decision possible), **requires** (forces another decision to follow), and **constrains** (limits what another decision can do):
 
 ```mermaid
 graph TD
@@ -843,12 +840,14 @@ sequenceDiagram
 
 | Pattern | Core Mechanism | Key Node Types | Primary Use Case |
 |---|---|---|---|
-| **Agent** | Central "brain" node routes to action nodes based on LLM output | DecisionNode → ActionNode(s) → loop | Q&A with tool use |
+| **Agent** | `DecideAction` routes to tool nodes via action strings; tool nodes loop back via `"decide"` | `DecideAction`, `SearchWeb`, `DirectAnswer` | Q&A with tool use |
 | **Workflow** | Linear `>>` chain of task nodes | Sequential `Node` chain | Multi-step document processing |
-| **RAG** | Offline index + online query as separate flows | IndexNode, RetrieveNode, GenerateNode | Document Q&A with vector search |
-| **Map-Reduce** | `BatchNode` maps; aggregation node reduces | `BatchNode`, ReduceNode | Summarising many documents in parallel |
-| **Structured Output** | Generate → validate → retry loop | GenerateNode, ValidateNode | Extracting typed data from text |
-| **Multi-Agent** | Sub-flows as specialist agents sharing a parent store | Nested `Flow` instances | Complex tasks requiring specialised roles |
+| **RAG** | Offline `BatchNode` indexing + online sequential query flow | `BatchNode` (chunk/embed), `Node` (retrieve/generate) | Document Q&A with vector search |
+| **Map-Reduce** | `BatchNode` maps `exec()` over each item; aggregation node reduces `exec_res_list` | `BatchNode`, `ReduceNode` | Summarising many documents in parallel |
+| **Structured Output** | `assert`/Pydantic in `exec()` raises exception to trigger internal `max_retries` | Single `Node(max_retries=N)` | Extracting typed data from text |
+| **Multi-Agent** | `AsyncNode`s with self-loops communicate via `asyncio.Queue` in shared store; run concurrently via `asyncio.gather()` | `AsyncNode` | Concurrent agent collaboration |
+| **Chain-of-Thought** | Single node self-loops (`"continue"`), accumulating reasoning steps in `shared["thoughts"]` until `"end"` | Single `Node` with self-loop | Complex multi-step reasoning |
+| **Memory Management** | Sliding window for short-term (`shared["messages"]`); FAISS vector index for long-term (`shared["vector_index"]`) | `RetrieveNode`, `AnswerNode`, `EmbedNode` | Long-running conversational agents |
 
 #### Agent
 
@@ -911,7 +910,7 @@ graph TD
 
 #### Map-Reduce
 
-A `BatchNode` fans out `exec()` over each item in parallel batches, then a dedicated **ReduceNode** aggregates all results into a single output.
+A `BatchNode` iterates `exec()` sequentially over each item returned by `prep()`, then a dedicated **ReduceNode** aggregates all results into a single output. For parallel execution, `AsyncParallelBatchNode` is used instead.
 
 ```mermaid
 graph TD
@@ -968,6 +967,41 @@ graph TD
     style AgentB fill:#fce4ec,stroke:#c62828
 ```
 
+#### Chain-of-Thought
+
+A single node accumulates reasoning steps in `shared["thoughts"]` and self-loops via `"continue"` until the LLM signals completion with `"end"`. Each iteration reads prior thoughts, queries the LLM for the next step, and appends the result.
+
+```mermaid
+graph TD
+    Start(["Start\nshared[problem]"]) --> CoT["ChainOfThoughtNode\n─────────────────\nprep(): format prior thoughts for prompt\nexec(): call LLM, parse YAML plan step\npost(): append to shared[thoughts]\n        return 'continue' or 'end'"]
+    CoT -->|continue| CoT
+    CoT -->|end| End(["End\nshared[solution]"])
+
+    SS[("Shared Store\n{problem,\nthoughts: [ ],\ncurrent_thought_number,\nsolution}")] <-->|read/write| CoT
+
+    style CoT fill:#e3f2fd,stroke:#1565c0
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+```
+
+#### Memory Management
+
+Combines a **sliding window** for short-term memory (`shared["messages"]`, ~6 messages) with a **FAISS vector index** for long-term memory (`shared["vector_index"]`). The `EmbedNode` archives oldest messages when the window overflows; `RetrieveNode` injects relevant past context at the start of each turn.
+
+```mermaid
+graph TD
+    Start(["New user turn"]) --> R["RetrieveNode\nQuery FAISS index\nshared[vector_index] → shared[retrieved_conversation]"]
+    R -->|default| A["AnswerNode\nLLM call using:\n- shared[retrieved_conversation]\n- shared[messages] (last 3 pairs)"]
+    A -->|default| E["EmbedNode\nIf messages > window size:\n  embed oldest pair → add to FAISS\n  trim shared[messages]"]
+    E -->|continue| R
+
+    SS[("Shared Store\n{messages: [ ] sliding window,\nvector_index: FAISS,\nretrieved_conversation}")] <-->|read/write| R & A & E
+
+    style R fill:#e8f5e9,stroke:#2e7d32
+    style A fill:#e3f2fd,stroke:#1565c0
+    style E fill:#fff3e0,stroke:#e65100
+    style SS fill:#f9a825,stroke:#e65100,color:#000
+```
+
 ### 9.5 Pattern Summary
 
 ```mermaid
@@ -992,17 +1026,19 @@ mindmap
       Map-Reduce
       Structured Output
       Multi-Agent
+      Chain-of-Thought
+      Memory Management
 ```
 
 ---
 
 ## 10. Quality Attribute Scenarios & Tactics
 
-Quality attributes in PocketFlow are analysed at two levels: **Quality Attribute Scenarios (QAS)** define concrete measurable requirements; **Architecture Tactics** identify the specific design decisions that control the quality attribute response (Bass et al., 2022).
+This section examines how well PocketFlow meets key quality goals like performance, reliability, and maintainability. The analysis uses two tools: **Quality Attribute Scenarios** describe how the system should behave in specific real situations; **Architecture Tactics** explain which design choices make that behaviour possible (Bass et al., 2022).
 
 ### 10.1 Quality Attribute Scenarios
 
-Following the standard QAS format from the course (Source → Stimulus → Environment → Artifact → Response → Measure):
+Each scenario answers six questions — **who** triggers it, **what** happens, **under what conditions**, **which part** of the system is involved, **how the system responds**, and **how success is measured**:
 
 | ID | Quality | Source | Stimulus | Environment | Artifact | Response | Measure |
 |---|---|---|---|---|---|---|---|
@@ -1016,7 +1052,7 @@ Following the standard QAS format from the course (Source → Stimulus → Envir
 
 ### 10.2 Architecture Tactics
 
-**Tactics** are design decisions that influence the control of a quality attribute response (Bass et al., 2022). The subsections below map each key quality attribute to its relevant tactics and concrete realisation in PocketFlow.
+**Tactics** are the specific design choices that make quality goals achievable. The subsections below show how PocketFlow addresses performance, reliability, and modifiability — and which parts of the code deliver each.
 
 #### Performance Tactics
 
@@ -1026,10 +1062,10 @@ graph TD
     PERF --> RD["Reduce Resource Demand"]
     PERF --> RM["Manage Resources"]
 
-    RD --> T1["Increase algorithm efficiency\nMinimal overhead in _orch loop"]
-    RD --> T2["Reduce computing overhead\nZero-dependency core; no startup cost"]
-    RM --> T3["Increase concurrency\nAsyncParallelBatchNode\nuses asyncio.gather"]
-    RM --> T4["Maintain resource clones\nNode instances copied per\nexecution via copy.copy"]
+    RD --> T1["Efficient orchestration\nMinimal overhead in _orch loop"]
+    RD --> T2["No startup cost\nZero dependencies; instant import"]
+    RM --> T3["Run tasks in parallel\nAsyncParallelBatchNode\nuses asyncio.gather"]
+    RM --> T4["Safe node reuse\nNode instances copied per\nexecution via copy.copy"]
 
     style PERF fill:#e3f2fd,stroke:#1565c0,color:#000
 ```
@@ -1043,22 +1079,22 @@ graph TD
     REL --> FR["Fault Recovery"]
     REL --> FP["Fault Prevention"]
 
-    FD --> R1["Exceptions\nexec() exceptions caught\nand counted vs. max_retries"]
-    FR --> R2["Active redundancy\nRetry loop up to\nmax_retries attempts"]
-    FR --> R3["exec_fallback()\nGraceful degradation\nwhen retries exhausted"]
-    FP --> R4["Exec isolation\nexec() has no shared store access\nSafe to retry without side effects"]
+    FD --> R1["Catch exceptions\nexec() exceptions counted\nagainst max_retries"]
+    FR --> R2["Automatic retry\nLoop up to\nmax_retries attempts"]
+    FR --> R3["Graceful fallback\nexec_fallback() called\nwhen retries exhausted"]
+    FP --> R4["Isolate exec()\nNo shared store access\nSafe to retry without side effects"]
 
     style REL fill:#e8f5e9,stroke:#2e7d32,color:#000
 ```
 
 #### Modifiability Tactics
 
-| Tactic Category | Sub-tactic | PocketFlow Implementation |
+| Goal | Approach | How PocketFlow does it |
 |---|---|---|
-| **Localise changes** | Semantic coherence | All vendor-specific code confined to `utils/` directory |
-| **Localise changes** | Anticipate expected changes | Shared Store schema designed upfront as explicit data contract |
-| **Prevention of ripple effects** | Information hiding | Nodes expose only `prep/exec/post` interface; internals hidden |
-| **Prevention of ripple effects** | Maintain existing interfaces | Flow's `_orch` API stable across all node changes |
+| **Keep changes local** | Group related code together | All vendor-specific code lives in `utils/` — changing LLM providers only touches that folder |
+| **Keep changes local** | Plan for expected changes upfront | Shared Store schema is designed first, so adding new data fields doesn't break existing nodes |
+| **Avoid ripple effects** | Hide internals | Nodes only expose `prep/exec/post` — callers don't depend on internal implementation details |
+| **Avoid ripple effects** | Stable interfaces | Flow's `_orch` method stays the same regardless of what nodes do internally |
 
 #### Tactic-to-Pattern Mapping
 
@@ -1085,32 +1121,32 @@ graph TD
 
 ## 11. Technical Debt Analysis
 
-PocketFlow's technical debt is primarily **intentional** — deliberate trade-offs aligned with its minimalist philosophy. The framework systematically transfers implementation burden to users in exchange for simplicity, flexibility, and zero vendor lock-in.
+In software, **technical debt** refers to shortcuts or limitations accepted now that may require extra work later. PocketFlow's debt is mostly **intentional** — conscious trade-offs made in favour of keeping the core small and simple. Many responsibilities are deliberately left to users rather than built into the framework itself.
 
 ### 11.1 Design Debt
 
-| Debt Item | Description | Root Cause | Trade-off Accepted |
+| Debt Item | What it means | Why it exists | What was gained |
 |---|---|---|---|
-| **100-line constraint** | Limits type annotations, advanced error handling, built-in validation | Intentional architectural constraint (ADD-01) | Portability and auditability gained |
-| **No built-in utilities** | Users implement all vendor integrations | ADD-03 — vendor API volatility avoidance | Flexibility and zero lock-in gained |
-| **Zero external dependencies** | Cannot use Pydantic, tenacity, etc. | ADD-01 — eliminates dependency conflicts | Supply chain safety gained |
-| **Minimal abstraction layer** | No Agent, Chain, or QA helpers | Keeps core minimal and flexible | Expressiveness transferred to users |
-| **Shared Store scalability** | In-memory dict; no transactions, no async race protection | ADD-07 design simplicity | Simplicity gained; scalability risk accepted |
-| **Type safety** | Core uses `Any` types; no runtime schema validation | 100-line constraint limits annotation | Flexibility gained; IDE support limited |
+| **100-line constraint** | No room for type annotations, detailed error messages, or built-in validation | Deliberate size limit (ADD-01) | The entire framework can be read and understood in minutes |
+| **No built-in utilities** | Users write all their own LLM and tool integrations | LLM provider APIs change too often to bundle safely (ADD-03) | No vendor lock-in; users own their integrations |
+| **Zero external dependencies** | Can't use popular libraries like Pydantic or tenacity | Eliminating dependency conflicts (ADD-01) | Installs without version conflicts; no supply chain risk |
+| **No high-level helpers** | No built-in Agent, RAG, or QA classes | Keeps the core small and general-purpose | Users can implement exactly what they need |
+| **In-memory shared store** | No transaction support; no protection against race conditions in async code | Simplicity (ADD-07) | Easy to understand and use; works for most use cases |
+| **Weak type safety** | Core uses generic `Any` types; no runtime schema checks | 100-line limit leaves no room for type machinery | Flexible and portable; works across Python versions |
 
 ### 11.2 Documentation Debt
 
-| Debt Item | Description | Root Cause | Impact |
+| Debt Item | What it means | Why it exists | Risk |
 |---|---|---|---|
-| **Documentation-First Policy** | AI agents must request MDC files before coding | Enables Agentic Coding (ADD-06) | Documentation overhead; drift risk |
-| **Cookbook as primary docs** | Examples serve as documentation; no formal API reference | Examples more instructive for LLM apps | Risk of stale examples; edge-case gaps |
+| **Documentation-first requirement** | AI coding tools need a design document before writing any code | Required for the agentic coding approach to work (ADD-06) | Documentation can fall out of sync with the actual code over time |
+| **Cookbook as the main docs** | Example projects serve as the primary documentation; there is no formal API reference | Hands-on examples teach LLM app patterns better than API docs alone | Examples may become outdated; edge cases may not be covered |
 
 ### 11.3 Test Debt
 
-| Debt Item | Description | Root Cause | Impact |
+| Debt Item | What it means | Why it exists | Risk |
 |---|---|---|---|
-| **No built-in testing framework** | No mock utilities, no flow test harness | ADD-01 — no external deps allowed | Inconsistent testing patterns across projects |
-| **No async test patterns** | `AsyncParallelBatchNode` rate-limit testing is non-trivial | Async complexity beyond 100-line scope | Risk of untested concurrency edge cases |
+| **No testing utilities** | No built-in helpers for mocking nodes, running test flows, or asserting on shared store state | Can't add external test libraries without breaking the zero-dependency rule (ADD-01) | Each project invents its own testing patterns; quality varies |
+| **Async testing is complex** | Testing `AsyncParallelBatchNode` under load or rate-limiting conditions requires custom setup | Async edge cases are too complex to handle within 100 lines | Concurrency bugs may only surface in production |
 
 ### 11.4 Project Debt Overview
 
@@ -1137,21 +1173,25 @@ graph LR
     style User fill:#fff3e0,stroke:#e65100
 ```
 
-**Summary:** Each debt item is a direct consequence of one or more ADDs, not of neglect. The primary runtime risk is that users implement utilities poorly — a risk the cookbook examples partially mitigate.
+**Summary:** None of these debt items are accidents — each is a direct consequence of a deliberate design decision. The biggest practical risk is that users write poor utility code without good examples to follow. The cookbook partially addresses this, but can't cover every case.
 
 ---
 
 ## 12. Conclusion
 
-This document has recovered PocketFlow's software architecture using three complementary frameworks: Kruchten's 4+1 View Model, Rozanski & Woods' Viewpoint Catalog, and the ISO/IEC/IEEE 42010 standard. Five architectural views were produced — Context, Logical, Development, Process, and Deployment — each addressed to specific stakeholders and concerns, as required by the viewpoint specification in §1.3.
+This document has recovered PocketFlow's software architecture through five views — Context, Logical, Development, Process, and Deployment — using Kruchten's 4+1 model, Rozanski & Woods' viewpoints, and the ISO/IEC/IEEE 42010 standard.
 
-**The central architectural finding is that PocketFlow's architecture is defined as much by what it deliberately excludes as by what it includes.** The seven ADDs form a coherent, mutually-enabling decision network with no significant internal contradictions: the 100-line constraint (ADD-01) forces the Graph + Shared Store abstraction (ADD-02), which necessitates action routing (ADD-05) and the lifecycle pattern (ADD-04), which in turn enables the Agentic Coding Methodology (ADD-06).
+**The most important finding is that PocketFlow's architecture is defined as much by what it deliberately leaves out as by what it includes.** The 100-line size limit isn't a bug — it's the constraint that forces every other decision into place. It requires the Graph + Shared Store abstraction (the simplest model that still covers all LLM patterns), which in turn requires action-based routing (how nodes hand off to each other) and the Prep–Exec–Post lifecycle (how individual nodes stay testable and retriable). All of this together makes the framework simple enough for AI coding tools to understand and use — which is the whole point of the Agentic Coding methodology.
 
-Applying the course's tactics framework reveals that PocketFlow addresses all major quality attributes through architectural mechanisms: reliability via `exec()` isolation and retry (Reliability tactics); modifiability via `utils/` isolation and data contracts (Modifiability tactics); performance via `asyncio.gather` (Performance tactics); portability via a language-agnostic core (Portability layer). These mechanisms are realised through three patterns: Blackboard, Template Method, and Mediator.
+**How PocketFlow meets quality goals:**
+- **Reliability** — `exec()` is isolated from shared state, so retrying a failed LLM call never corrupts data. The `exec_fallback()` method handles unrecoverable failures gracefully.
+- **Modifiability** — Switching LLM providers only touches `utils/call_llm.py`. The Shared Store data contract keeps nodes independent of each other.
+- **Performance** — `AsyncParallelBatchNode` runs multiple LLM calls at once using `asyncio.gather`, so batch jobs run as fast as the slowest single call rather than the sum of all.
+- **Portability** — The Graph + Shared Store abstraction has been re-implemented in six other languages, proving the core idea is language-independent.
 
-**Primary quality risk and recommendation:** The absence of Shared Store schema validation is the most significant structural weakness. Runtime `KeyError` or type mismatches from undisciplined data contract usage are the most likely source of production failures. An optional Pydantic-based validator — delivered as a separate package, not in the 100-line core — would address this risk without violating any existing ADD.
+**Biggest risk and recommendation:** The Shared Store has no built-in schema validation. If a node writes the wrong key or data type, the error only appears at runtime — potentially deep in a long workflow. The most practical fix would be an optional Pydantic-based validator delivered as a separate package, keeping the 100-line core intact.
 
-In conclusion, PocketFlow is an architecturally coherent and well-motivated framework for LLM orchestration. Its minimalism is a deliberate strength: every architectural decision is traceable to a specific stakeholder concern or quality attribute, and the decision network is internally consistent.
+Overall, PocketFlow is a well-reasoned, internally consistent framework. Its minimalism is a deliberate strength — not a limitation — and every architectural decision can be traced back to a clear reason.
 
 ---
 
