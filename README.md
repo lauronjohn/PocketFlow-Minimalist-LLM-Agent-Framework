@@ -769,28 +769,7 @@ In software, **technical debt** refers to shortcuts or limitations accepted now 
 
 ### 11.4 Project Debt Overview
 
-```mermaid
-graph LR
-    subgraph Framework["PocketFlow Provides"]
-        F1["Graph abstraction"]
-        F2["Node lifecycle"]
-        F3["Action routing"]
-        F4["Basic retry"]
-    end
-
-    subgraph User["User Must Implement"]
-        U1["LLM / VDB integrations"]
-        U2["Design patterns: Agent, RAG..."]
-        U3["State persistence"]
-        U4["Complex error handling"]
-        U5["Testing infrastructure"]
-    end
-
-    Framework -->|intentional transfer| User
-
-    style Framework fill:#e8f5e9,stroke:#2e7d32
-    style User fill:#fff3e0,stroke:#e65100
-```
+![alt text](assets/image-23.png)
 
 **Summary:** None of these debt items are accidents — each is a direct consequence of a deliberate design decision. The biggest practical risk is that users write poor utility code without good examples to follow. The cookbook partially addresses this, but can't cover every case.
 
