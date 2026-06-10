@@ -182,7 +182,7 @@ Understanding who cares about PocketFlow clarifies the trade-offs in its design.
 
 **The wider ecosystem / language communities.** PocketFlow has been ported to TypeScript, Java, C++, Go, Rust, and PHP. Contributors in those communities are stakeholders in keeping the abstraction consistent across languages.
 
-A key insight: the maintainers' interest (keep it minimal) and the developers' interest (have powerful features) appear to conflict, but PocketFlow resolves this by pushing features *out* of the framework and *into* user code and documentation. The "features" become reusable design patterns rather than framework classes.
+The maintainers' interest (keep it minimal) and the developers' interest (have powerful features) appear to conflict, but PocketFlow resolves this by pushing features *out* of the framework and *into* user code and documentation. The "features" become reusable design patterns rather than framework classes.
 
 The stakeholders and their competing concerns can be summarized:
 
