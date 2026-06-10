@@ -314,12 +314,12 @@ PocketFlow/
 └── README.md
 ```
 
-- `**pocketflow/**` — the entire framework, contained in a single `__init__.py` of roughly 100 lines. This is the heart of the project; everything else is supporting material.
-- `**cookbook/**` — a large collection of self-contained example apps (chat, RAG, agent, batch, streaming, map-reduce, multi-agent, voice chat, FastAPI/WebSocket integrations, and more). These serve as both documentation and templates.
-- `**docs/**` — the documentation site, organized into *Core Abstraction*, *Design Pattern*, and *Utility Function* sections.
-- `**tests/*`* — the test suite for the core engine.
-- `**utils/**` — helper utilities.
-- `**.cursorrules` / `.cursor/rules**` — configuration that tells AI coding assistants how to work with the framework, reflecting the "Agentic Coding" philosophy as a first-class concern.
+- `pocketflow/` — the entire framework, contained in a single `__init__.py` of roughly 100 lines. This is the heart of the project; everything else is supporting material.
+- `cookbook/` — a large collection of self-contained example apps (chat, RAG, agent, batch, streaming, map-reduce, multi-agent, voice chat, FastAPI/WebSocket integrations, and more). These serve as both documentation and templates.
+- `docs/` — the documentation site, organized into *Core Abstraction*, *Design Pattern*, and *Utility Function* sections.
+- `tests/`* — the test suite for the core engine.
+- `utils/` — helper utilities.
+- `.cursorrules` / `.cursor/rules` — configuration that tells AI coding assistants how to work with the framework, reflecting the "Agentic Coding" philosophy as a first-class concern.
 
 The codebase is overwhelmingly **Python** (~~71%), with a large share of **Jupyter notebooks** (~~21%) used for tutorials and examples — a split that reflects how much of the project is *teaching material* rather than framework code:
 
