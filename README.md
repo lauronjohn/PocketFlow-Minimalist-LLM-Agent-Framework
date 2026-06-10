@@ -53,6 +53,8 @@
 
 PocketFlow is an open-source framework for building applications powered by Large Language Models (LLMs). Its defining characteristic is radical minimalism: the entire core engine is about **100 lines of Python**, with **zero external dependencies** and **zero vendor lock-in**.
 
+<img width="2558" height="859" alt="image" src="https://github.com/user-attachments/assets/1f5acde5-01a3-4a35-897f-e57716b1891e" />
+
 Most popular LLM frameworks (LangChain, CrewAI, AutoGen, LangGraph) ship tens of thousands of lines of code and hundreds of megabytes of dependencies. They bundle pre-built integrations for specific vendors (OpenAI, Pinecone, etc.) and specific applications (summarization, QA). PocketFlow rejects this approach. Its thesis is that all of these frameworks are really doing the same thing underneath — *chaining LLM calls together, passing data between them, and handling failures* — and that this core idea can be captured by a single abstraction: a **graph**.
 
 In PocketFlow, an application is modeled as a directed graph:
