@@ -8,7 +8,10 @@
 
 ---
 
-## Table of Contents
+<details open>
+<summary style="font-size:1.15em"><strong>Table of Contents</strong></summary>
+
+<div style="font-size:1.05em">
 
 1. [Introduction](#1-introduction)
 2. [Architecture Views and Viewpoints Selected](#2-architecture-views-and-viewpoints-selected)
@@ -43,6 +46,55 @@
 16. [Conclusion](#16-conclusion)
 17. [References](#17-references)
 
+</div>
+
+</details>
+
+<details>
+<summary style="font-size:1.15em"><strong>Table of Figures</strong></summary>
+
+<div style="font-size:1.05em">
+
+| Figure | Description |
+|---|---|
+| [Figure 1](#figure-1) | PocketFlow compared with mainstream LLM frameworks by lines of code and install size |
+| [Figure 2](#figure-2) | The four core primitives of PocketFlow — Node, Action, Flow, and Shared Store — and their relationships |
+| [Figure 3](#figure-3) | Architecture views selected for the PocketFlow recovery report, with stakeholders and concerns addressed |
+| [Figure 4](#figure-4) | PocketFlow stakeholders, their main concerns, and the key trade-offs they accept |
+| [Figure 5](#figure-5) | Stakeholder map showing influence versus interest for each stakeholder group |
+| [Figure 6](#figure-6) | Key architecture drivers that shape PocketFlow's design decisions |
+| [Figure 7](#figure-7) | Architecture-significant use cases and their impact on the architecture |
+| [Figure 8](#figure-8) | Context diagram showing PocketFlow as an embedded library between the host application and external services |
+| [Figure 9](#figure-9) | Logical view — the four core abstractions (Node, Action, Flow, Shared Store) all inherit from BaseNode |
+| [Figure 10](#figure-10) | The Node lifecycle — prep, exec, and post — with only prep and post touching the Shared Store |
+| [Figure 11](#figure-11) | Expense-approval flow with three actions — approved, needs_revision, and rejected — including a loop-back for revisions |
+| [Figure 12](#figure-12) | Nested flows — each box is a sub-flow composed of its own nodes, wired together with the same >> syntax |
+| [Figure 13](#figure-13) | Codebase composition — Python (~71%) and Jupyter notebooks (~21%) dominate, reflecting PocketFlow's balance of framework code and teaching material |
+| [Figure 14](#figure-14) | The basic execution loop — a single-threaded synchronous walk of the graph driven by the Flow |
+| [Figure 15](#figure-15) | Failure handling — Node retries up to max_retries with wait intervals, then falls back to exec_fallback() |
+| [Figure 16](#figure-16) | Deployment view — PocketFlow embedded as a library inside CLI, web (FastAPI), Streamlit, and voice applications, all reaching external services over the network |
+| [Figure 17](#figure-17) | Overview of the eight architecture design decisions and the quality attributes each one affects |
+| [Figure 18](#figure-18) | Relationship network among the eight architecture design decisions — gray edges name how decisions depend on or enable each other |
+| [Figure 19](#figure-19) | Trade-off summary for each architecture design decision — every benefit has a corresponding cost |
+| [Figure 20](#figure-20) | Architecture patterns used within PocketFlow's design and how each appears in the framework |
+| [Figure 21](#figure-21) | Template Method pattern — the framework defines the prep → exec → post skeleton; developers override individual steps |
+| [Figure 22](#figure-22) | Composite pattern — a Flow is composed of Nodes and can itself be used as a Node inside another Flow |
+| [Figure 23](#figure-23) | Blackboard / Shared Repository pattern — Nodes read from and write to the Shared Store without calling each other directly |
+| [Figure 24](#figure-24) | Pipe and Filter pattern — Nodes act as processing steps connected in sequence, with data flowing through the stages |
+| [Figure 25](#figure-25) | LLM application patterns expressible by composing PocketFlow's four core primitives |
+| [Figure 26](#figure-26) | Agent pattern — a looping Flow where a Node decides the next Action, creating dynamic agent behavior from static graph primitives |
+| [Figure 27](#figure-27) | RAG (Retrieval-Augmented Generation) pattern — a retrieval Flow combined with a generation Flow |
+| [Figure 28](#figure-28) | Map-Reduce pattern — batch processing nodes (map) followed by an aggregation step (reduce) |
+| [Figure 29](#figure-29) | Quality attribute scenarios — eight SMART scenarios covering modifiability, reliability, learnability, portability, performance, testability, maintainability, and debuggability |
+| [Figure 30](#figure-30) | Quality attribute tactics summary — each quality attribute mapped to supporting architecture decisions and main tactics |
+| [Figure 31](#figure-31) | Technical debt items — root causes, impacts, and who bears the cost |
+| [Figure 32](#figure-32) | Technical debt ranking — likelihood of occurrence versus severity of impact |
+| [Figure 33](#figure-33) | Revision summary and weekly progress log — eight weeks of architecture recovery work |
+
+</div>
+
+</details>
+
 ---
 
 
@@ -76,6 +128,8 @@ The scale of this minimalism is clearest in direct comparison with mainstream fr
 | AutoGen        | Agent            | Some (Tool Agent, Chat Agent) | Many (optional)                | ~7 K          | +26 MB        |
 | **PocketFlow** | **Graph**        | **None**                      | **None**                       | **~100**      | **+56 KB**    |
 
+<a id="figure-1"></a>
+*Figure 1: PocketFlow compared with mainstream LLM frameworks by lines of code and install size.*
 
 The four primitives relate to one another like this:
 
@@ -83,6 +137,8 @@ The four primitives relate to one another like this:
   <img src="diagrams/diagram_1.png" alt="Diagram 1" width="600"/>
 </p>
 
+<a id="figure-2"></a>
+*Figure 2: The four core primitives of PocketFlow — Node, Action, Flow, and Shared Store — and their relationships.*
 
 From these four primitives, PocketFlow can express every common LLM design pattern — Agents, Multi-Agents, Workflows, Retrieval-Augmented Generation (RAG), Map-Reduce, and more — without adding any new framework code. Everything specific to *your* app (the LLM client, the database, the tools) is code *you* bring; the framework only orchestrates the graph.
 
@@ -102,6 +158,9 @@ This report recovers PocketFlow's architecture using a structured, multi-view ap
 | Process View | Developers, testers, maintainers | Runtime behavior, branching, retries, flow execution | Sequence diagram and flowcharts |
 | Development / Implementation View | Maintainers, contributors, port communities | Repository structure, code organization, maintainability | Directory tree and module description |
 | Deployment View | Application developers, DevOps users | How PocketFlow is embedded into CLI, web, Streamlit, and voice apps | Deployment diagram |
+
+<a id="figure-3"></a>
+*Figure 3: Architecture views selected for the PocketFlow recovery report, with stakeholders and concerns addressed.*
 
 ---
 
@@ -137,10 +196,15 @@ The stakeholders and their competing concerns can be summarized:
 | LLM / infra providers     | Be callable from any framework          | No first-party PocketFlow integration  |
 | Language-port communities | Consistent abstraction across languages | Some ports lag (e.g., no async yet)    |
 
+<a id="figure-4"></a>
+*Figure 4: PocketFlow stakeholders, their main concerns, and the key trade-offs they accept.*
 
 Placing these stakeholders by how much influence they have over the design versus how much they care about it:
 
 ![Diagram 2](diagrams/diagram_2.png)
+
+<a id="figure-5"></a>
+*Figure 5: Stakeholder map showing influence versus interest for each stakeholder group.*
 
 <a id="4-key-architecture-drivers"></a>
 
@@ -158,6 +222,9 @@ The main architecture drivers of PocketFlow are:
 | AI-assistant readability | AI coding tools should be able to understand and generate PocketFlow applications | The codebase and abstractions are kept small, regular, and convention-based |
 | Portability | The same abstraction should be portable to other programming languages | The architecture avoids Python-specific complexity where possible |
 
+<a id="figure-6"></a>
+*Figure 6: Key architecture drivers that shape PocketFlow's design decisions.*
+
 <a id="5-architecture-significant-use-cases"></a>
 
 ## 5. Architecture-Significant Use Cases
@@ -171,6 +238,9 @@ The main architecture drivers of PocketFlow are:
 | ASU-05 | Developer replaces OpenAI with another LLM provider | Requires vendor-neutral utility functions |
 | ASU-06 | Developer reuses a sub-flow inside a larger flow | Requires Flow-as-Node composition |
 | ASU-07 | AI coding assistant generates a PocketFlow application | Requires a small, readable, convention-based core |
+
+<a id="figure-7"></a>
+*Figure 7: Architecture-significant use cases and their impact on the architecture.*
 
 ---
 
@@ -199,6 +269,9 @@ The crucial architectural decision visible at this level is the **"bring your ow
 
 ![Diagram 3](diagrams/diagram_3.png)
 
+<a id="figure-8"></a>
+*Figure 8: Context diagram showing PocketFlow as an embedded library between the host application and external services.*
+
 The main components in the context model are:
 
 - **Host Application** — the application that embeds PocketFlow, such as a CLI, web app, Streamlit app, or FastAPI service.
@@ -225,7 +298,8 @@ PocketFlow’s logical architecture is built around four core abstractions, with
 
 ![Diagram 4](diagrams/diagram_4.png)
 
-
+<a id="figure-9"></a>
+*Figure 9: Logical view — the four core abstractions (Node, Action, Flow, Shared Store) all inherit from BaseNode.*
 
 The most important relationship to notice is that **`Node` and `Flow` both inherit from `BaseNode`**. A `Node` performs work, while a `Flow` orchestrates a successor graph of `BaseNode` instances. This gives Flows node-like behavior and makes nested flows possible (Section 7.5), without implying that `Flow` directly extends `Node`.
 
@@ -240,6 +314,9 @@ A **Node** is the smallest building block. Every node follows the same strict th
 This three-step split is a deliberate enforcement of **separation of concerns**: data access (`prep`/`post`) is kept separate from pure computation (`exec`). All three steps are optional — a node that only reshapes data can implement just `prep` and `post`.
 
 ![Diagram 5](diagrams/diagram_5.png)
+
+<a id="figure-10"></a>
+*Figure 10: The Node lifecycle — prep, exec, and post — with only prep and post touching the Shared Store.*
 
 
 
@@ -271,6 +348,9 @@ For example, an expense-approval flow where one node returns one of three action
 
 ![Diagram 6](diagrams/diagram_6.png)
 
+<a id="figure-11"></a>
+*Figure 11: Expense-approval flow with three actions — approved, needs_revision, and rejected — including a loop-back for revisions.*
+
 
 
 ### 7.4 Shared Store — the communication channel
@@ -284,6 +364,9 @@ There is a secondary, narrower channel called **Params** — a small, immutable,
 A powerful structural feature is that **a Flow has node-like behavior because it also inherits from `BaseNode`**. This means a whole Flow can be dropped into another Flow as a reusable graph component. A Flow can run its own `prep()` and `post()`, while its main work is orchestrating child graph elements from its start node. This lets developers build large pipelines out of small, reusable sub-flows — for example, an order pipeline composed of a payment sub-flow, an inventory sub-flow, and a shipping sub-flow chained together.
 
 ![Diagram 7](diagrams/diagram_7.png)
+
+<a id="figure-12"></a>
+*Figure 12: Nested flows — each box is a sub-flow composed of its own nodes, wired together with the same >> syntax.*
 
 
 
@@ -327,6 +410,9 @@ The codebase is overwhelmingly **Python** (~~71%), with a large share of **Jupyt
 
 ![Diagram 8](diagrams/diagram_8.png)
 
+<a id="figure-13"></a>
+*Figure 13: Codebase composition — Python (~71%) and Jupyter notebooks (~21%) dominate, reflecting PocketFlow's balance of framework code and teaching material.*
+
 
 
 A defining structural choice is that **the framework code and the integration code are kept separate**. PocketFlow ships no vendor wrappers. Instead, utility functions (an LLM caller, an embedding function, a web-search helper) are documented as patterns the developer copies into their own project. This keeps the maintained surface area tiny and means the framework rarely needs updates when an external API changes.
@@ -355,6 +441,9 @@ This is a **single-threaded, synchronous walk** of the graph by default. State i
 
 ![Diagram 9](diagrams/diagram_9.png)
 
+<a id="figure-14"></a>
+*Figure 14: The basic execution loop — a single-threaded synchronous walk of the graph driven by the Flow.*
+
 
 
 ### 9.2 Failure handling at runtime
@@ -362,6 +451,9 @@ This is a **single-threaded, synchronous walk** of the graph by default. State i
 Failure handling is localized to `Node._exec()`. If `exec()` raises, the node retries up to `max_retries`, optionally waiting `wait` seconds between attempts. If all retries fail, `exec_fallback()` is called. By default, `exec_fallback()` re-raises the exception; developers can override it to return a graceful fallback result. Because `exec()` receives only `prep_res` rather than the Shared Store itself, retried calls are less likely to leave shared state half-written.
 
 <img src="diagrams/diagram_10.png" alt="Diagram 10" width="500">
+
+<a id="figure-15"></a>
+*Figure 15: Failure handling — Node retries up to max_retries with wait intervals, then falls back to exec_fallback().*
 
 
 
@@ -394,6 +486,9 @@ The external services a deployment depends on (LLM APIs, vector databases, tool 
 
 ![Diagram 11](diagrams/diagram_11.png)
 
+<a id="figure-16"></a>
+*Figure 16: Deployment view — PocketFlow embedded as a library inside CLI, web (FastAPI), Streamlit, and voice applications, all reaching external services over the network.*
+
 ---
 
 
@@ -417,6 +512,9 @@ The goal is not only to list what PocketFlow does, but to explain why its archit
 | ADD-006 | Use Action strings for routing              | Flexibility, simplicity, agent support              |
 | ADD-007 | Make Flow composable as a Node              | Reusability, composability, scalability of design   |
 | ADD-008 | Optimize the framework for Agentic Coding   | Learnability, AI-assistance, developer productivity |
+
+<a id="figure-17"></a>
+*Figure 17: Overview of the eight architecture design decisions and the quality attributes each one affects.*
 
 ---
 
@@ -586,6 +684,9 @@ The architecture design decisions are related rather than independent. Some deci
 
 ![Diagram 12](diagrams/diagram_12.png)
 
+<a id="figure-18"></a>
+*Figure 18: Relationship network among the eight architecture design decisions — gray edges name how decisions depend on or enable each other.*
+
 The small gray nodes name the relationship between decisions. Graph-based orchestration needs shared data, routing, and composition. The minimal core externalizes integrations, preserves low dependency cost, and enables Agentic Coding. The `prep → exec → post` lifecycle connects state access and routing by controlling Shared Store use and returning Action strings.
 
 ---
@@ -602,6 +703,9 @@ The small gray nodes name the relationship between decisions. Graph-based orches
 | ADD-006 Action-string routing          | Simple branching, looping, and agent behavior                                     | Possible errors from string typos                    |
 | ADD-007 Flow as Node                   | Reusable and hierarchical composition                                             | Slightly more complex mental model                   |
 | ADD-008 Agentic Coding optimization    | Easier AI-assisted development                                                    | Relies on conventions and examples                   |
+
+<a id="figure-19"></a>
+*Figure 19: Trade-off summary for each architecture design decision — every benefit has a corresponding cost.*
 
 Overall, PocketFlow’s architecture is shaped by a consistent design philosophy: keep the framework core small, general, and composable, while pushing application-specific complexity to user-defined Nodes, utility functions, and examples. The result is a minimal orchestration kernel that is flexible enough to express many LLM application patterns, but disciplined use is required to manage state, routing, integrations, and observability in larger applications.
 
@@ -628,6 +732,9 @@ This distinction is important because PocketFlow does not implement many high-le
 | Pipe and Filter | Partial match | A Flow can connect Nodes as a chain or graph of processing steps | Improves modularity and workflow composition, but PocketFlow is not a pure pipe-and-filter system |
 | Separation of Concerns / Layered Boundary | Design principle / tactic | PocketFlow separates orchestration logic from developer-written utility functions for LLMs, vector databases, tools, and APIs | Improves modifiability and vendor neutrality |
 
+<a id="figure-20"></a>
+*Figure 20: Architecture patterns used within PocketFlow's design and how each appears in the framework.*
+
 ### Template Method Pattern
 
 PocketFlow strongly uses the Template Method pattern through the Node lifecycle. Every Node follows the same high-level execution structure:
@@ -640,6 +747,9 @@ The framework defines the overall execution skeleton, while developers customize
 
 ![Diagram 13](diagrams/diagram_13.png)
 
+<a id="figure-21"></a>
+*Figure 21: Template Method pattern — the framework defines the prep → exec → post skeleton; developers override individual steps.*
+
 This pattern supports reliability and testability. Since `prep()` handles preparation, `exec()` performs the main computation, and `post()` writes results and returns the next Action, each responsibility is separated. This also makes retry handling safer because the main computation can be isolated inside `exec()`.
 
 ### Composite Pattern
@@ -649,6 +759,9 @@ PocketFlow strongly uses the Composite pattern because a Flow has node-like beha
 For example, a complex application can be decomposed into separate sub-flows for retrieval, reasoning, tool use, and final generation. Each sub-flow can then be reused or nested inside another Flow.
 
 ![Diagram 14](diagrams/diagram_14.png)
+
+<a id="figure-22"></a>
+*Figure 22: Composite pattern — a Flow is composed of Nodes and can itself be used as a Node inside another Flow.*
 
 The benefit is hierarchical reuse and composability. The trade-off is that deeply nested flows may become harder to visualize and debug.
 
@@ -660,6 +773,9 @@ This means Nodes do not need to call each other directly. Instead, they cooperat
 
 ![Diagram 15](diagrams/diagram_15.png)
 
+<a id="figure-23"></a>
+*Figure 23: Blackboard / Shared Repository pattern — Nodes read from and write to the Shared Store without calling each other directly.*
+
 The benefit is loose coupling and flexible composition. The trade-off is that the Shared Store can become global mutable state if developers do not manage key names, data ownership, and schemas carefully.
 
 ### Pipe and Filter Pattern
@@ -669,6 +785,9 @@ PocketFlow partially follows the Pipe and Filter pattern. In a simple workflow, 
 This pattern is visible in workflows, RAG pipelines, and map-reduce tasks, where data moves through several processing stages.
 
 ![Diagram 16](diagrams/diagram_16.png)
+
+<a id="figure-24"></a>
+*Figure 24: Pipe and Filter pattern — Nodes act as processing steps connected in sequence, with data flowing through the stages.*
 
 However, PocketFlow is not a pure Pipe and Filter architecture. In a pure pipe-and-filter system, data is usually passed directly through pipes between filters. In PocketFlow, Nodes often communicate through the Shared Store, and routing is controlled by Action strings. Therefore, Pipe and Filter should be described as a partial match rather than the main architectural pattern.
 
@@ -693,6 +812,9 @@ PocketFlow’s official design philosophy is that high-level LLM patterns are no
 | Structured Output | A Node prompts or parses output into a fixed structure |
 | Multi-Agent | Multiple agent-like Nodes or sub-flows coordinate through shared state |
 
+<a id="figure-25"></a>
+*Figure 25: LLM application patterns expressible by composing PocketFlow's four core primitives.*
+
 ### Workflow
 
 A Workflow is represented as a chain or graph of Nodes. Each Node performs one step, and the Flow determines the execution order.
@@ -707,6 +829,9 @@ The Flow then follows the corresponding transition. This means agent behavior em
 
 ![Diagram 17](diagrams/diagram_17.png)
 
+<a id="figure-26"></a>
+*Figure 26: Agent pattern — a looping Flow where a Node decides the next Action, creating dynamic agent behavior from static graph primitives.*
+
 ### RAG
 
 RAG can be represented as a combination of retrieval and generation Nodes. One part of the Flow retrieves relevant information, while another Node uses that information to generate an answer.
@@ -715,6 +840,9 @@ PocketFlow does not need a special RAG framework class. The RAG pattern is expre
 
 ![Diagram 18](diagrams/diagram_18.png)
 
+<a id="figure-27"></a>
+*Figure 27: RAG (Retrieval-Augmented Generation) pattern — a retrieval Flow combined with a generation Flow.*
+
 ### Map-Reduce
 
 Map-Reduce can be expressed using batch processing and aggregation. The map phase processes many items independently, while the reduce phase combines the results.
@@ -722,6 +850,9 @@ Map-Reduce can be expressed using batch processing and aggregation. The map phas
 This pattern fits PocketFlow’s Batch and Parallel execution variants, especially for document processing, summarization, or multi-item LLM workloads.
 
 ![Diagram 19](diagrams/diagram_19.png)
+
+<a id="figure-28"></a>
+*Figure 28: Map-Reduce pattern — batch processing nodes (map) followed by an aggregation step (reduce).*
 
 ### Structured Output
 
@@ -757,6 +888,9 @@ The scenarios below focus on the quality attributes most relevant to PocketFlow:
 | QA-07 | Maintainability   | Framework maintainer        | A new feature request proposes adding built-in provider integrations or high-level framework wrappers                | Open-source maintenance and review process                                    | PocketFlow core                                     | Maintainer evaluates whether the feature belongs in the core or should remain as documentation, utility code, or cookbook example | The core remains small and dependency-free; feature growth does not significantly increase the maintained framework surface | Preserve minimal core; push application-specific features to examples and utilities                |
 | QA-08 | Debuggability     | Application developer       | A Flow stops unexpectedly because no transition matches the returned Action string                                   | Runtime execution of a branching or looping Flow                              | Action routing and Flow transitions                 | Developer inspects returned Actions and declared transitions to identify the missing or misspelled route                          | The failure can be localized to the Node’s returned Action or the Flow’s transition definition                              | Keep routing explicit through Action strings; document transition paths clearly                    |
 
+<a id="figure-29"></a>
+*Figure 29: Quality attribute scenarios — eight SMART scenarios covering modifiability, reliability, learnability, portability, performance, testability, maintainability, and debuggability.*
+
 ### 13.1 Quality Attribute Tactics Summary
 
 | Quality Attribute | Supporting Architecture Decisions                            | Main Tactics                                                           |
@@ -769,6 +903,9 @@ The scenarios below focus on the quality attributes most relevant to PocketFlow:
 | Testability       | ADD-004 Node lifecycle                                       | Separation of `prep`, `exec`, and `post`; isolated Node execution      |
 | Maintainability   | ADD-002 Minimal core, ADD-003 Bring-your-own integrations    | Small maintenance surface, application-specific logic outside the core |
 | Debuggability     | ADD-006 Action-string routing                                | Explicit transitions, localized routing inspection                     |
+
+<a id="figure-30"></a>
+*Figure 30: Quality attribute tactics summary — each quality attribute mapped to supporting architecture decisions and main tactics.*
 
 The quality scenarios show that PocketFlow’s quality attributes mainly come from its deliberate minimalism and strict separation of responsibilities. Modifiability and maintainability are supported by keeping external integrations outside the framework core. Reliability and testability are supported by the `prep → exec → post` lifecycle, which separates state access from computation and enables safer retries. Learnability and portability are supported by the small set of core abstractions: Node, Action, Flow, and Shared Store.
 
@@ -805,10 +942,15 @@ Overall, PocketFlow's technical debt is the mirror image of its strengths: the s
 | Documentation-as-implementation | Patterns live in docs, not core         | Trusted surface > 100 lines; can go stale   | Developers       |
 | Limited observability           | No native logging/tracing               | Hard to debug long agent loops              | Developers       |
 
+<a id="figure-31"></a>
+*Figure 31: Technical debt items — root causes, impacts, and who bears the cost.*
 
 Ranking these by how likely they are to bite versus how much they hurt:
 
 ![Diagram 20](diagrams/diagram_20.png)
+
+<a id="figure-32"></a>
+*Figure 32: Technical debt ranking — likelihood of occurrence versus severity of impact.*
 
 
 
@@ -829,6 +971,9 @@ Ranking these by how likely they are to bite versus how much they hurt:
 | Week 6 — Midterm | [x] Quality Attribute Scenarios |
 | Week 7 | [x] Technical Debt Analysis |
 | Week 8 — Final | [x] Logical View<br/> [x] Deployment View<br/> [x] Architecture Tactics<br/> [x] Decision Relationship Graph<br/> [x] Conclusion |
+
+<a id="figure-33"></a>
+*Figure 33: Revision summary and weekly progress log — eight weeks of architecture recovery work.*
 
 
 ---
