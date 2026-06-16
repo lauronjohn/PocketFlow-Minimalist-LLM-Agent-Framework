@@ -406,6 +406,8 @@ PocketFlow/
 - `utils/` — helper utilities.
 - `.cursorrules` / `.cursor/rules` — configuration that tells AI coding assistants how to work with the framework, reflecting the "Agentic Coding" philosophy as a first-class concern.
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/e5b8a841-88da-4ace-af37-4048fbd55cbf" />
+
 The codebase is overwhelmingly **Python** (~76%), with a significant share of **Jupyter notebooks** (~17%) and **HTML/CSS** (~7%) used for tutorials, documentation, and examples — a split that reflects how much of the project is *teaching material* rather than framework code:
 
 ![Diagram 8](diagrams/diagram_8.png)
