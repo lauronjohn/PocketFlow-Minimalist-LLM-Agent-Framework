@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PocketFlow — Software Architecture Recovery</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.min.css">
+<style>
+  /* ── Base ── */
+  :root {
+    --pf-blue: #1a56db;
+    --pf-dark: #111827;
+    --pf-mid: #374151;
+    --pf-light: #e5e7eb;
+    --pf-accent: #f59e0b;
+    --pf-bg: #f9fafb;
+    --pf-card: #ffffff;
+    --pf-border: #d1d5db;
+  }
+  .reveal {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 28px;
+    color: var(--pf-dark);
+  }
+  .reveal h1 { font-size: 2em; font-weight: 700; color: var(--pf-blue); }
+  .reveal h2 { font-size: 1.5em; font-weight: 700; color: var(--pf-blue); margin-bottom: 0.4em; }
+  .reveal h3 { font-size: 1.15em; font-weight: 600; color: var(--pf-dark); margin-bottom: 0.3em; }
+  .reveal p, .reveal li { line-height: 1.6; }
+  .reveal .slides section { padding: 40px 60px; text-align: left; }
+  .reveal .slides section.title-slide { text-align: center; }
+  .reveal .slides section.title-slide h1 { font-size: 2.4em; margin-bottom: 0.2em; }
+  .reveal pre { font-size: 0.7em; box-shadow: none; }
+  .reveal table { font-size: 0.72em; margin: 16px auto; border-collapse: collapse; width: 100%; }
+  .reveal table th { background: var(--pf-blue); color: white; padding: 8px 12px; font-weight: 600; }
+  .reveal table td { padding: 6px 12px; border-bottom: 1px solid var(--pf-border); }
+  .reveal table tr:nth-child(even) td { background: #f3f4f6; }
+  .reveal ul, .reveal ol { margin-left: 0.4em; }
+  .reveal li { margin-bottom: 0.25em; }
+
+  /* ── Layout helpers ── */
+  .two-col { display: flex; gap: 30px; align-items: flex-start; }
+  .two-col > * { flex: 1; }
+  .three-col { display: flex; gap: 20px; align-items: flex-start; }
+  .three-col > * { flex: 1; }
+  .img-center { text-align: center; margin: 12px 0; }
+  .img-center img { max-width: 100%; max-height: 420px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .img-sm img { max-height: 260px; }
+  .img-xs img { max-height: 180px; }
+
+  .stat-box {
+    background: var(--pf-card); border-left: 5px solid var(--pf-blue);
+    border-radius: 8px; padding: 16px 20px; margin: 12px 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .stat-box h3 { color: var(--pf-blue); margin-top: 0; }
+  .tag {
+    display: inline-block; background: var(--pf-blue); color: #fff;
+    border-radius: 4px; padding: 2px 10px; font-size: 0.65em; font-weight: 600;
+    margin-right: 6px;
+  }
+  .tag-light {
+    display: inline-block; background: #dbeafe; color: var(--pf-blue);
+    border-radius: 4px; padding: 2px 10px; font-size: 0.65em; font-weight: 600;
+    margin-right: 6px;
+  }
+  .highlight { color: var(--pf-blue); font-weight: 700; }
+  .small-note { font-size: 0.65em; color: #6b7280; margin-top: 8px; }
+
+  /* ── Speaker notes (hidden in slides, visible in speaker view) ── */
+  .notes { display: none; }
+
+  /* ── Progress bar ── */
+  .reveal .progress { color: var(--pf-blue); height: 4px; }
+
+  /* TOC slide */
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; font-size: 0.72em; }
+  .toc-grid div { padding: 4px 0; border-bottom: 1px dotted var(--pf-border); }
+  .toc-num { color: var(--pf-blue); font-weight: 700; margin-right: 4px; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — TITLE                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section class="title-slide">
+  <h1>PocketFlow</h1>
+  <h2 style="color:var(--pf-mid); font-weight:400;">Software Architecture Recovery</h2>
+  <p style="margin-top:30px; font-size:0.75em; color:var(--pf-mid);">
+    <strong>Author:</strong> Lauron John Albert &nbsp;|&nbsp; 2025272110006<br>
+    <strong>Course:</strong> Modern Software Architecture — Wuhan University, 2026<br>
+    <strong>Instructor:</strong> Prof. Peng Liang<br>
+    <strong>Target System:</strong> <a href="https://github.com/The-Pocket/PocketFlow">PocketFlow</a>
+  </p>
+  <p style="margin-top:20px; font-size:0.6em; color:#9ca3af;">
+    Frameworks: DESOSA 2019 · Rozanski & Woods (2012) · Kruchten 4+1 (1995) · ISO/IEC/IEEE 42010:2011
+  </p>
+
+  <aside class="notes">
+    Good morning/afternoon. Today I'll present the architecture recovery of PocketFlow — a remarkably
+    small open-source LLM framework. Over the next 12 minutes, we'll walk through the multi-view
+    architecture analysis I conducted over eight weeks. Let's begin.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — INTRODUCTION                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>1. Introduction — What is PocketFlow?</h2>
+
+  <div class="stat-box">
+    <h3>~100 lines of Python · Zero Dependencies · Zero Vendor Lock-in</h3>
+    <p style="margin:0;">PocketFlow is a <span class="highlight">minimalist LLM framework</span> that models applications as <span class="highlight">nested directed graphs</span>.</p>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <p><strong>Four core primitives:</strong></p>
+      <ul>
+        <li><span class="highlight">Node</span> — unit of work (e.g., one LLM call)</li>
+        <li><span class="highlight">Action</span> — labeled edge deciding next node</li>
+        <li><span class="highlight">Flow</span> — orchestrates the graph walk</li>
+        <li><span class="highlight">Shared Store</span> — common data dictionary</li>
+      </ul>
+    </div>
+    <div class="img-center img-sm">
+      <img src="https://github.com/user-attachments/assets/1f5acde5-01a3-4a35-897f-e57716b1891e" alt="Framework comparison chart" style="max-height:260px;">
+      <p class="small-note">Figure 1: PocketFlow vs. mainstream frameworks</p>
+    </div>
+  </div>
+
+  <aside class="notes">
+    PocketFlow is built on a bold thesis: all LLM frameworks are really doing the same thing — chaining
+    LLM calls, passing data, handling failures. The authors captured this in ~100 Python lines using
+    four primitives: Nodes do work, Actions route, Flows orchestrate, and a Shared Store carries state.
+    Compared to LangChain's 405,000 lines, PocketFlow's core is literally a single init file.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — CORE PRIMITIVES DIAGRAM                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Core Primitives — How They Fit Together</h2>
+  <div class="two-col">
+    <div>
+      <p>From these four building blocks, PocketFlow can express <strong>every common LLM design pattern</strong> — Agents, Multi-Agents, Workflows, RAG, Map-Reduce — without adding new framework code.</p>
+      <p style="font-size:0.8em;">Everything specific to <em>your</em> app (LLM client, database, tools) is code <em>you</em> bring. The framework only orchestrates the graph.</p>
+    </div>
+    <div class="img-center">
+      <img src="diagrams/diagram_1.png" alt="Core primitives" style="max-height:300px;">
+      <p class="small-note">Figure 2: Four core primitives and their relationships</p>
+    </div>
+  </div>
+
+  <aside class="notes">
+    The diagram on the right visualizes how Node, Action, Flow, and Shared Store relate. A Node
+    produces an Action string; the Flow reads it and transitions. The Shared Store is the
+    communication channel. The magic is that these four primitives compose to express everything
+    from simple pipelines to complex multi-agent systems.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — ARCHITECTURE VIEWS SELECTED                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>2. Architecture Views and Viewpoints Selected</h2>
+  <table>
+    <tr><th>View</th><th>Stakeholders</th><th>Concerns Addressed</th></tr>
+    <tr><td><strong>Context View</strong></td><td>Developers, maintainers, users</td><td>System boundary, external systems, integration</td></tr>
+    <tr><td><strong>Logical View</strong></td><td>Developers, maintainers, port contributors</td><td>Core abstractions, responsibilities, relationships</td></tr>
+    <tr><td><strong>Process View</strong></td><td>Developers, testers, maintainers</td><td>Runtime behavior, branching, retries, flow execution</td></tr>
+    <tr><td><strong>Development View</strong></td><td>Maintainers, contributors, port communities</td><td>Repository structure, code organization</td></tr>
+    <tr><td><strong>Deployment View</strong></td><td>App developers, DevOps</td><td>Embedding in CLI, web, Streamlit, voice apps</td></tr>
+  </table>
+  <p class="small-note">Figure 3: Architecture views selected for this recovery report</p>
+
+  <aside class="notes">
+    I selected five views inspired by the 4+1 and DESOSA models. Each view addresses specific
+    stakeholder concerns. Context shows boundaries; Logical shows abstractions; Process shows
+    runtime dynamics; Development shows code organization; Deployment shows real-world embedding.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — STAKEHOLDER ANALYSIS                                        -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>3. Stakeholder Analysis and Concerns</h2>
+  <div class="two-col">
+    <div>
+      <table style="font-size:0.62em;">
+        <tr><th>Stakeholder</th><th>Main Concern</th></tr>
+        <tr><td>Framework maintainers</td><td>Keep core ~100 lines, readable</td></tr>
+        <tr><td>Application developers</td><td>Low learning curve, flexibility</td></tr>
+        <tr><td><strong>AI coding agents</strong></td><td>Fit framework in context window</td></tr>
+        <tr><td>End users</td><td>Reliable, responsive apps</td></tr>
+        <tr><td>LLM / infra providers</td><td>Be callable from any framework</td></tr>
+        <tr><td>Language-port communities</td><td>Consistent abstraction across languages</td></tr>
+      </table>
+      <p class="small-note">Figure 4: Stakeholders, concerns, and trade-offs</p>
+    </div>
+    <div class="img-center img-sm">
+      <img src="diagrams/diagram_2.png" alt="Stakeholder map">
+      <p class="small-note">Figure 5: Stakeholder influence vs. interest map</p>
+    </div>
+  </div>
+
+  <aside class="notes">
+    PocketFlow has a unique stakeholder group: AI coding agents. The framework is deliberately small
+    enough that tools like Cursor can fit the entire codebase in their context window. Notice how
+    maintainers and developers have apparently conflicting interests — the framework resolves this
+    by pushing features into user code and documentation rather than the core.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 — KEY ARCHITECTURE DRIVERS                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>4. Key Architecture Drivers</h2>
+  <table>
+    <tr><th>Driver</th><th>Architectural Impact</th></tr>
+    <tr><td><span class="highlight">Minimalism</span></td><td>Avoids heavy abstractions; keeps only Node, Flow, Action, Shared Store</td></tr>
+    <tr><td><span class="highlight">Zero Dependencies</span></td><td>Integration logic pushed into user-written utility functions</td></tr>
+    <tr><td><span class="highlight">Vendor Neutrality</span></td><td>"Bring your own integration" boundary; no vendor-specific code</td></tr>
+    <tr><td><span class="highlight">Composability</span></td><td>Graph-based composition and nested flows enable all LLM patterns</td></tr>
+    <tr><td><span class="highlight">Reliability</span></td><td>Nodes support retries, wait intervals, and fallback behavior</td></tr>
+    <tr><td><span class="highlight">AI-Assistant Readability</span></td><td>Small, regular, convention-based code that fits in AI context windows</td></tr>
+    <tr><td><span class="highlight">Portability</span></td><td>Language-independent abstractions; ported to 6+ languages</td></tr>
+  </table>
+  <p class="small-note">Figure 6: Key architecture drivers and their impact</p>
+
+  <aside class="notes">
+    These seven drivers explain every design decision in PocketFlow. The standout is
+    "AI-Assistant Readability" — it's rare to see a framework explicitly designed so
+    that machines can write applications with it. The 100-line constraint isn't
+    just aesthetic; it's practical.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 — ARCHITECTURE-SIGNIFICANT USE CASES                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>5. Architecture-Significant Use Cases</h2>
+  <table style="font-size:0.72em;">
+    <tr><th>ID</th><th>Use Case</th><th>Why Architecture-Significant</th></tr>
+    <tr><td>ASU-01</td><td>Build sequential LLM workflow</td><td>Requires clear Node and Flow abstractions</td></tr>
+    <tr><td>ASU-02</td><td>Build agent with branching & loops</td><td>Requires Action-based routing and graph traversal</td></tr>
+    <tr><td>ASU-03</td><td>Build RAG pipeline</td><td>Requires composition of retrieval + generation nodes</td></tr>
+    <tr><td>ASU-04</td><td>LLM/API call fails temporarily</td><td>Requires retry and fallback mechanisms</td></tr>
+    <tr><td>ASU-05</td><td>Replace OpenAI with another provider</td><td>Requires vendor-neutral utility functions</td></tr>
+    <tr><td>ASU-06</td><td>Reuse sub-flow in larger flow</td><td>Requires Flow-as-Node composition</td></tr>
+    <tr><td>ASU-07</td><td>AI assistant generates an app</td><td>Requires small, readable, convention-based core</td></tr>
+  </table>
+  <p class="small-note">Figure 7: Architecture-significant use cases</p>
+
+  <aside class="notes">
+    These seven use cases drove the architecture. Notice how each one maps directly to
+    a core abstraction or design decision. ASU-02 (branching agent) drives Action routing.
+    ASU-04 (failure handling) drives the retry mechanism. ASU-07 is the most unusual —
+    it means the framework is literally designed so AI can use it.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 — CONTEXT VIEW                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>6. Context View</h2>
+  <div class="two-col">
+    <div>
+      <p><strong>PocketFlow is an embedded library — not a service.</strong></p>
+      <p>It draws a hard boundary:</p>
+      <ul>
+        <li><span class="tag-light">Inside</span> orchestration logic</li>
+        <li><span class="tag-light">Outside</span> all integration logic</li>
+      </ul>
+      <p style="margin-top:12px;">This "bring your own everything" boundary is why the install size is <strong>~56 KB</strong> vs. competitors' <strong>26–198 MB</strong>.</p>
+    </div>
+    <div class="img-center">
+      <img src="diagrams/diagram_3.png" alt="Context diagram" style="max-height:340px;">
+      <p class="small-note">Figure 8: Context diagram</p>
+    </div>
+  </div>
+
+  <aside class="notes">
+    The context view shows PocketFlow's most important architectural boundary. The framework
+    is a thin layer between the host application and the developer's utility functions.
+    It never imports OpenAI or Pinecone — the developer writes a small call_llm() utility
+    and invokes it inside a node. This constraint is why the dependency list is empty.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 9 — LOGICAL VIEW: OVERVIEW + NODE LIFECYCLE                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>7. Logical View — Core Abstractions</h2>
+  <div class="two-col">
+    <div>
+      <p>Four abstractions, one base:</p>
+      <ul>
+        <li><strong>Node</strong> — unit of work</li>
+        <li><strong>Action</strong> — routing result (a string)</li>
+        <li><strong>Flow</strong> — graph orchestrator</li>
+        <li><strong>Shared Store</strong> — communication state</li>
+      </ul>
+      <p style="font-size:0.78em;">Key insight: <span class="highlight">Node and Flow both inherit from BaseNode</span> — this is what enables nested flows.</p>
+    </div>
+    <div class="img-center img-sm">
+      <img src="diagrams/diagram_4.png" alt="Logical view">
+      <p class="small-note">Figure 9: Logical view — class relationships</p>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-top:16px;">
+    <div class="img-center img-xs">
+      <img src="diagrams/diagram_5.png" alt="Node lifecycle" style="max-height:200px;">
+      <p class="small-note">Figure 10: Node lifecycle — prep → exec → post</p>
+    </div>
+    <div>
+      <p style="font-size:0.78em;"><strong>Node Lifecycle (3-step):</strong></p>
+      <ol style="font-size:0.72em;">
+        <li><strong>prep(shared)</strong> — reads from Shared Store</li>
+        <li><strong>exec(prep_res)</strong> — computation; <em>must not touch Shared Store</em></li>
+        <li><strong>post(shared, prep_res, exec_res)</strong> — writes & returns Action</li>
+      </ol>
+      <p style="font-size:0.7em;">Sealing <code>exec()</code> away from the Shared Store is what makes retries safe.</p>
+    </div>
+  </div>
+
+  <aside class="notes">
+    The logical view centers on four abstractions. The Node lifecycle is critical: prep reads,
+    exec computes in isolation, post writes and routes. The exec step is deliberately sealed
+    off from shared state — so if an LLM call fails, retrying doesn't corrupt anything.
+    Node and Flow both inherit from BaseNode, which is the design move that makes nested flows possible.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 10 — ACTIONS, FLOW, NESTED FLOWS                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>7. Logical View — Actions, Flow & Nested Composition</h2>
+  <div class="two-col">
+    <div class="img-center img-xs">
+      <img src="diagrams/diagram_6.png" alt="Expense approval flow" style="max-height:260px;">
+      <p class="small-note">Figure 11: Expense-approval flow with branching</p>
+    </div>
+    <div class="img-center img-xs">
+      <img src="diagrams/diagram_7.png" alt="Nested flows" style="max-height:260px;">
+      <p class="small-note">Figure 12: Nested flows — sub-flows as reusable components</p>
+    </div>
+  </div>
+  <div style="margin-top:8px;">
+    <p style="font-size:0.75em;"><strong>Action</strong> = a plain string returned by <code>post()</code>. Syntax: <code>node_a - "approved" >> next_node</code></p>
+    <p style="font-size:0.75em;"><strong>Flow</strong> walks the graph: runs current element → reads Action → follows transition → repeats.</p>
+    <p style="font-size:0.75em;"><strong>Nested flows:</strong> A Flow itself is a BaseNode, so it can be dropped into another Flow. Build large pipelines from small, reusable sub-flows.</p>
+  </div>
+
+  <aside class="notes">
+    Actions drive routing. An expense-approval node returns "approved", "needs_revision", or
+    "rejected" — and the Flow walks accordingly. Because transitions can point backwards,
+    loops and agents emerge naturally. Nested flows are the compositional superpower: each
+    box in figure 12 is an entire sub-flow, wired with the same >> syntax as individual nodes.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 11 — DEVELOPMENT VIEW                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>8. Development View</h2>
+  <div class="two-col">
+    <div>
+      <p style="font-size:0.78em;"><strong>Repository structure:</strong></p>
+      <pre style="font-size:0.58em;">
+PocketFlow/
+├── pocketflow/
+│   └── __init__.py     ← ENTIRE framework
+├── cookbook/           ← self-contained examples
+├── docs/               ← Core Abstraction / Design Patterns
+├── tests/              ← core engine test suite
+├── utils/              ← helper utilities
+├── .cursorrules        ← rules for AI coding assistants
+└── README.md
+      </pre>
+    </div>
+    <div class="img-center img-sm">
+      <img src="diagrams/diagram_8.png" alt="Codebase composition">
+      <p class="small-note">Figure 13: Codebase — ~76% Python, ~17% Jupyter notebooks</p>
+    </div>
+  </div>
+  <p style="font-size:0.72em; margin-top:8px;">The framework code and integration code are <strong>kept strictly separate</strong>. PocketFlow ships zero vendor wrappers. Utility functions are documented as patterns developers copy into their own projects.</p>
+
+  <aside class="notes">
+    The development view reveals the repository's deliberate leanness. The entire framework lives
+    in a single __init__.py. The cookbook folder is massive — reflecting that this project is as
+    much teaching material as framework code (21% Jupyter notebooks). The .cursorrules file is
+    a first-class artifact, showing how seriously PocketFlow takes AI-assisted development.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 12 — PROCESS VIEW                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>9. Process View — Runtime Execution &amp; Failure Handling</h2>
+  <div class="two-col">
+    <div class="img-center img-xs">
+      <img src="diagrams/diagram_9.png" alt="Execution loop" style="max-height:240px;">
+      <p class="small-note">Figure 14: Basic execution loop</p>
+    </div>
+    <div class="img-center img-xs">
+      <img src="diagrams/diagram_10.png" alt="Failure handling" style="max-height:240px;">
+      <p class="small-note">Figure 15: Failure handling — retries & fallback</p>
+    </div>
+  </div>
+  <div style="margin-top:8px; font-size:0.72em;">
+    <p><strong>Execution:</strong> Single-threaded synchronous walk by default. Flow runs current element → reads Action → transitions → repeats.</p>
+    <p><strong>Failure:</strong> Node retries <code>exec()</code> up to <code>max_retries</code> with <code>wait</code> intervals. On total failure, <code>exec_fallback()</code> provides a safe result. Because <code>exec()</code> is sealed from Shared Store, retries leave state consistent.</p>
+    <p><strong>Advanced:</strong> Async, Batch, and Async Parallel Batch variants for I/O-bound workloads. Some language ports are sync-only — an active complexity frontier.</p>
+  </div>
+
+  <aside class="notes">
+    At runtime, PocketFlow runs a simple loop: execute node, read action, find next, repeat.
+    Failure handling is localized to each node — retries happen inside exec(), which is
+    isolated from shared state. This is why the framework can be so small: the process model
+    is straightforward and doesn't need complex error-propagation machinery.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 13 — DEPLOYMENT VIEW                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>10. Deployment View</h2>
+  <div class="two-col">
+    <div>
+      <p>PocketFlow is a <span class="highlight">library, not a service</span> — no daemon, no server, no prescribed topology.</p>
+      <p style="font-size:0.78em;"><strong>Deployment shapes (from cookbook):</strong></p>
+      <ul style="font-size:0.72em;">
+        <li><strong>CLI tools</strong> — terminal-driven flows with human-in-the-loop</li>
+        <li><strong>Web backends</strong> — FastAPI + WebSockets + SSE</li>
+        <li><strong>Interactive apps</strong> — Streamlit with finite-state machines</li>
+        <li><strong>Voice applications</strong> — VAD → STT → LLM → TTS pipeline</li>
+      </ul>
+      <p style="font-size:0.7em;">Framework footprint: ~56 KB, no special hardware requirements.</p>
+    </div>
+    <div class="img-center img-sm">
+      <img src="diagrams/diagram_11.png" alt="Deployment view">
+      <p class="small-note">Figure 16: Deployment diagram</p>
+    </div>
+  </div>
+
+  <aside class="notes">
+    Deployment is entirely determined by the host application. PocketFlow imposes no runtime
+    requirements beyond Python. You can embed it in a CLI script, a FastAPI server, or a
+    Streamlit dashboard. External services like LLM APIs are reached over the network from
+    inside node code. The deployment cost is dominated by those external services, not by
+    PocketFlow itself.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 14 — ARCHITECTURE DESIGN DECISIONS                              -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>11. Architecture Design Decisions</h2>
+
+  <table style="font-size:0.56em;">
+    <tr><th>ID</th><th>Decision</th><th>Quality Attributes Affected</th></tr>
+    <tr><td>ADD-001</td><td>Model LLM applications as graphs</td><td>Flexibility, composability, learnability</td></tr>
+    <tr><td>ADD-002</td><td>Keep core minimal & dependency-free</td><td>Maintainability, portability, learnability</td></tr>
+    <tr><td>ADD-003</td><td>Use bring-your-own integrations</td><td>Modifiability, vendor neutrality, maintainability</td></tr>
+    <tr><td>ADD-004</td><td>prep → exec → post node lifecycle</td><td>Reliability, testability, separation of concerns</td></tr>
+    <tr><td>ADD-005</td><td>Shared Store for node communication</td><td>Modifiability, composability, flexibility</td></tr>
+    <tr><td>ADD-006</td><td>Action strings for routing</td><td>Flexibility, simplicity, agent support</td></tr>
+    <tr><td>ADD-007</td><td>Flow composable as a Node</td><td>Reusability, composability, design scalability</td></tr>
+    <tr><td>ADD-008</td><td>Optimize for Agentic Coding</td><td>Learnability, AI-assistance, developer productivity</td></tr>
+  </table>
+
+  <div class="two-col" style="margin-top:8px;">
+    <div class="img-center img-xs">
+      <img src="diagrams/diagram_12.png" alt="Decision relationships" style="max-height:200px;">
+      <p class="small-note" style="margin-top:2px;">Figure 18: Decision relationship network</p>
+    </div>
+    <div style="font-size:0.51em; line-height:1.25;">
+      <p style="font-weight:700; margin:0 0 2px 0;">Figure 19: Decision Trade-Off Summary</p>
+      <table style="margin:0;">
+        <tr><th>Decision</th><th>Main Benefit</th><th>Main Trade-off</th></tr>
+        <tr><td>ADD-001 Graph-based orchestration</td><td>One model can express workflows, agents, RAG, map-reduce, multi-agent</td><td>Developers must compose high-level patterns manually</td></tr>
+        <tr><td>ADD-002 Minimal core</td><td>Easy to understand, maintain, audit, and port</td><td>Fewer built-in features</td></tr>
+        <tr><td>ADD-003 Bring-your-own integrations</td><td>Vendor neutrality and low dependency risk</td><td>More integration work for developers</td></tr>
+        <tr><td>ADD-004 prep → exec → post lifecycle</td><td>Clear separation of concerns and safer retries</td><td>Slightly more ceremony for simple Nodes</td></tr>
+        <tr><td>ADD-005 Shared Store</td><td>Loose coupling between Nodes</td><td>Risk of unmanaged global mutable state</td></tr>
+        <tr><td>ADD-006 Action-string routing</td><td>Simple branching, looping, and agent behavior</td><td>Possible errors from string typos</td></tr>
+        <tr><td>ADD-007 Flow as Node</td><td>Reusable and hierarchical composition</td><td>Slightly more complex mental model</td></tr>
+        <tr><td>ADD-008 Agentic Coding optimization</td><td>Easier AI-assisted development</td><td>Relies on conventions and examples</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <aside class="notes">
+    Nine specific relationships connect the eight decisions. The graph model requires
+    shared-dict communication, labeled edges, and nested composition. The minimal core
+    externalizes vendor code, replaces new classes with nesting, and fits in AI context
+    windows. BYO integrations motivate retry logic in the node lifecycle, which in turn
+    constrains store access and returns routing decisions. Every benefit has a
+    corresponding trade-off, shown next.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 15 — ARCHITECTURE PATTERNS                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>12. Architecture Patterns Used in PocketFlow</h2>
+
+  <table style="font-size:0.62em;">
+    <tr><th>Pattern</th><th>Match</th><th>How It Appears</th></tr>
+    <tr><td><strong>Template Method</strong></td><td>Strong</td><td>prep → exec → post lifecycle; devs override steps</td></tr>
+    <tr><td><strong>Composite</strong></td><td>Strong</td><td>Flow as BaseNode; nested inside another Flow</td></tr>
+    <tr><td><strong>Blackboard / Shared Repository</strong></td><td>Strong</td><td>Nodes read/write Shared Store without direct calls</td></tr>
+    <tr><td><strong>Pipe and Filter</strong></td><td>Partial</td><td>Nodes as processing steps in sequence/graph</td></tr>
+    <tr><td><strong>Layered Boundary (tactic)</strong></td><td>Present</td><td>Orchestration core separated from integration code</td></tr>
+  </table>
+
+  <div class="three-col img-xs" style="margin-top:8px;">
+    <div class="img-center"><img src="diagrams/diagram_13.png" style="max-height:140px;"><p class="small-note">Fig 21: Template Method</p></div>
+    <div class="img-center"><img src="diagrams/diagram_14.png" style="max-height:140px;"><p class="small-note">Fig 22: Composite</p></div>
+    <div class="img-center"><img src="diagrams/diagram_15.png" style="max-height:140px;"><p class="small-note">Fig 23: Blackboard</p></div>
+  </div>
+
+  <aside class="notes">
+    PocketFlow exhibits three strong pattern matches. Template Method in the node lifecycle —
+    the framework defines the skeleton, developers fill in the steps. Composite in nested
+    flows — a Flow can be used wherever a Node is expected. Blackboard in the Shared Store —
+    nodes communicate through shared state rather than direct calls. Pipe and Filter is a
+    partial match because nodes CAN be chained sequentially but also branch and loop.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 16 — LLM APPLICATION PATTERNS                                   -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>12. LLM Application Patterns — Expressed by Composition</h2>
+  <p style="font-size:0.72em;">These are <strong>not</strong> built-in framework classes — they emerge from composing the four primitives.</p>
+
+  <div class="three-col img-xs" style="margin-top:8px;">
+    <div class="img-center">
+      <img src="diagrams/diagram_17.png" style="max-height:160px;">
+      <p class="small-note">Figure 26: Agent — looping flow with decision node</p>
+    </div>
+    <div class="img-center">
+      <img src="diagrams/diagram_18.png" style="max-height:160px;">
+      <p class="small-note">Figure 27: RAG — retrieval + generation</p>
+    </div>
+    <div class="img-center">
+      <img src="diagrams/diagram_19.png" style="max-height:160px;">
+      <p class="small-note">Figure 28: Map-Reduce — batch + aggregate</p>
+    </div>
+  </div>
+
+  <table style="font-size:0.62em; margin-top:8px;">
+    <tr><th>Pattern</th><th>Expressed As</th><th>Pattern</th><th>Expressed As</th></tr>
+    <tr><td>Workflow</td><td>Sequence/graph of Nodes</td><td>Agent</td><td>Looping Flow with decision Node</td></tr>
+    <tr><td>RAG</td><td>Retrieval Flow + Generation Flow</td><td>Map-Reduce</td><td>Batch Nodes + aggregation step</td></tr>
+    <tr><td>Structured Output</td><td>Node with parsing logic</td><td>Multi-Agent</td><td>Multiple agent Nodes / sub-flows</td></tr>
+  </table>
+
+  <aside class="notes">
+    This is the key insight of PocketFlow: high-level LLM patterns are not implemented as
+    heavy framework classes. They emerge from composition. An agent is just a looping flow
+    where a node decides the next action. RAG is a retrieval flow combined with a generation
+    flow. Map-Reduce is batch nodes followed by aggregation. No new framework code needed.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 17 — QUALITY ATTRIBUTE SCENARIOS & TACTICS                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>13. Quality Attribute Scenarios &amp; Tactics</h2>
+
+  <table style="font-size:0.55em;">
+    <tr><th>QA</th><th>Attribute</th><th>Scenario</th><th>Tactic</th></tr>
+    <tr><td>QA-01</td><td>Modifiability</td><td>Provider API changes — only utility function needs update</td><td>Encapsulate integrations outside core</td></tr>
+    <tr><td>QA-02</td><td>Reliability</td><td>LLM call fails — retries up to max_retries, then fallback</td><td>Retry, fallback, side-effect isolation</td></tr>
+    <tr><td>QA-03</td><td>Learnability</td><td>New developer needs to understand framework</td><td>Minimal core, small conceptual model</td></tr>
+    <tr><td>QA-04</td><td>Portability</td><td>Contributor ports to another language</td><td>Language-independent abstractions</td></tr>
+    <tr><td>QA-05</td><td>Performance</td><td>Many independent LLM calls — use async/parallel</td><td>Async, batching, parallelization</td></tr>
+    <tr><td>QA-06</td><td>Testability</td><td>Test one node without full app or real services</td><td>Separate prep/exec/post; isolated units</td></tr>
+    <tr><td>QA-07</td><td>Maintainability</td><td>Feature request for built-in integrations</td><td>Keep core small; push features to examples</td></tr>
+    <tr><td>QA-08</td><td>Debuggability</td><td>Flow stops — no transition matches Action string</td><td>Explicit routing; localized inspection</td></tr>
+  </table>
+  <p class="small-note">Figure 29: Quality attribute scenarios | Figure 30: Tactics summary</p>
+
+  <aside class="notes">
+    Eight SMART quality scenarios. PocketFlow's quality attributes come mainly from deliberate
+    minimalism. Modifiability and maintainability are supported by keeping integrations outside
+    the core. Reliability and testability come from the prep-exec-post lifecycle. But these
+    benefits have trade-offs: developers must manage provider utilities, Shared Store schemas,
+    and observability themselves. The same decisions that improve simplicity can reduce
+    built-in safety in larger applications.
+  </aside>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 18 — TECHNICAL DEBT & CONCLUSION                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>14–16. Technical Debt &amp; Conclusion</h2>
+
+  <div class="two-col">
+    <div>
+      <p style="font-size:0.72em;"><strong>Six debt items identified:</strong></p>
+      <table style="font-size:0.55em;">
+        <tr><th>Debt</th><th>Who Pays</th></tr>
+        <tr><td>Pushed-out complexity</td><td>Developers</td></tr>
+        <tr><td>Global mutable Shared Store</td><td>Developers</td></tr>
+        <tr><td>Implicit graph structure</td><td>Developers</td></tr>
+        <tr><td>Incomplete concurrency (ports)</td><td>Port communities</td></tr>
+        <tr><td>Documentation-as-implementation</td><td>Developers</td></tr>
+        <tr><td>Limited built-in observability</td><td>Developers</td></tr>
+      </table>
+      <p class="small-note">Figures 31–32: Technical debt analysis</p>
+    </div>
+    <div>
+      <p style="font-size:0.72em;"><strong>Conclusion:</strong></p>
+      <p style="font-size:0.68em;">PocketFlow is best understood as a <span class="highlight">minimal, composable orchestration kernel</span>.</p>
+      <p style="font-size:0.68em;">Its real product is an <em>abstraction</em> — the bet that with the right four primitives, everything else is just composition.</p>
+      <p style="font-size:0.68em; margin-top:8px;"><strong>Key trade-off:</strong> Complexity is not eliminated — it's <em>relocated</em> into user code and documentation. For small-to-medium apps and teams valuing transparency, this is an excellent bargain.</p>
+    </div>
+  </div>
+
+  <div class="img-center" style="margin-top:6px;">
+    <img src="diagrams/diagram_20.png" alt="Technical debt ranking" style="max-height:200px;">
+  </div>
+
+  <aside class="notes">
+    Technical debt is the mirror image of PocketFlow's strengths. The same minimalism that
+    makes it elegant also offloads responsibility — for integrations, state hygiene, graph
+    visibility, and observability — onto developers. In conclusion, PocketFlow demonstrates
+    that a ~100-line, zero-dependency framework can express every common LLM pattern. The
+    architecture is coherent because every decision serves the same goal: keep the core
+    minimal and composable, push everything else out. Thank you. I'm happy to take questions.
+  </aside>
+</section>
+
+</div>
+</div>
+
+<!-- ── Reveal.js ── -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.min.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    progress: true,
+    center: true,
+    transition: 'slide',
+    width: 1280,
+    height: 800,
+    margin: 0.08,
+    minScale: 0.35,
+    maxScale: 2.0,
+    plugins: [ RevealNotes ],
+    // PDF export
+    pdfSeparateFragments: false,
+  });
+</script>
+</body>
+</html>
