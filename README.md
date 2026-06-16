@@ -399,14 +399,14 @@ PocketFlow/
 └── README.md
 ```
 
+<img width="1024" height="775" alt="image" src="https://github.com/user-attachments/assets/e95798ae-2f8d-4e57-8e2c-9c1001593767" />
+
 - `pocketflow/` — the entire framework, contained in a single `__init__.py` of roughly 100 lines. This is the heart of the project; everything else is supporting material.
 - `cookbook/` — a large collection of self-contained example apps (chat, RAG, agent, batch, streaming, map-reduce, multi-agent, voice chat, FastAPI/WebSocket integrations, and more). These serve as both documentation and templates.
 - `docs/` — the documentation site, organized into *Core Abstraction*, *Design Pattern*, and *Utility Function* sections.
 - `tests/`* — the test suite for the core engine.
 - `utils/` — helper utilities.
 - `.cursorrules` / `.cursor/rules` — configuration that tells AI coding assistants how to work with the framework, reflecting the "Agentic Coding" philosophy as a first-class concern.
-
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/e5b8a841-88da-4ace-af37-4048fbd55cbf" />
 
 The codebase is overwhelmingly **Python** (~76%), with a significant share of **Jupyter notebooks** (~17%) and **HTML/CSS** (~7%) used for tutorials, documentation, and examples — a split that reflects how much of the project is *teaching material* rather than framework code:
 
