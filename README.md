@@ -93,6 +93,9 @@
 | [Figure 32](#figure-32) | Technical debt items — root causes, impacts, and who bears the cost |
 | [Figure 33](#figure-33) | Technical debt ranking — likelihood of occurrence versus severity of impact |
 | [Figure 34](#figure-34) | Revision summary and weekly progress log — eight weeks of architecture recovery work |
+| [Figure 35](#figure-35) | Workflow pattern — sequential nodes connected with the >> syntax; data flows through the Shared Store |
+| [Figure 36](#figure-36) | Structured Output pattern — a single Node calls the LLM with a format constraint and writes structured data to the Shared Store |
+| [Figure 37](#figure-37) | Multi-Agent pattern — two agents communicate bidirectionally through the Shared Store, with loop-back for iterative coordination |
 
 </div>
 
@@ -924,6 +927,18 @@ flow = Flow(start=fetch)
 flow.run(shared)
 ```
 
+```mermaid
+graph LR
+    S["Shared Store<br/>{query}"] -->|prep reads| A["FetchNode<br/>call_api"]
+    A -->|"default"| B["ProcessNode<br/>transform"]
+    A -.->|post writes| S
+    S -->|prep reads| B
+    B -.->|post writes| R["Shared Store<br/>{result}"]
+```
+
+<a id="figure-35"></a>
+*Figure 35: Workflow pattern — sequential nodes connected with the >> syntax; data flows through the Shared Store rather than directly between nodes.*
+
 ### Agent
 
 An Agent is represented as a Flow with branching and looping behavior. A Node can call an LLM, decide what should happen next, and return an Action string such as `"search"`, `"retry"`, `"answer"`, or `"finish"`.
@@ -1020,6 +1035,15 @@ class ExtractNode(Node):
     def post(self, shared, p, e):   shared["structured"] = json.loads(e); return "default"
 ```
 
+```mermaid
+graph LR
+    S["Shared Store<br/>{query}"] -->|prep reads| N["ExtractNode<br/>prep→exec→post<br/>call_llm(format=json)"]
+    N -->|post writes| S2["Shared Store<br/>{structured}"]
+```
+
+<a id="figure-36"></a>
+*Figure 36: Structured Output pattern — a single Node calls the LLM with a format constraint, parses the response, and writes structured data to the Shared Store.*
+
 This is an application-level pattern rather than a separate framework-level architecture pattern.
 
 ### Multi-Agent
@@ -1044,6 +1068,23 @@ class AgentB(Node):
 agent_a - "done" >> agent_b
 agent_b - "loop" >> agent_a
 ```
+
+```mermaid
+graph LR
+    S["Shared Store<br/>inbox / outbox"]
+    A["AgentA<br/>decide_action<br/>writes outbox"]
+    B["AgentB<br/>respond<br/>writes inbox"]
+
+    S -->|prep reads inbox| A
+    A -.->|post writes outbox| S
+    A -->|"done"| B
+    S -->|prep reads outbox| B
+    B -.->|post writes inbox| S
+    B -->|"loop"| A
+```
+
+<a id="figure-37"></a>
+*Figure 37: Multi-Agent pattern — two agents communicate bidirectionally through the Shared Store; AgentB loops back to AgentA until a terminal condition is reached.*
 
 This pattern is supported by the same underlying graph and Shared Store model.
 
