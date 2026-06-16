@@ -432,18 +432,27 @@ The project also maintains **parallel ports** in TypeScript, Java, C++, Go, Rust
 
 ## 9. Process View
 
-The Process View describes what happens at runtime — the dynamic behavior.
+The Process View describes what happens at runtime — the dynamic behavior of a PocketFlow application as it executes.
 
 ### 9.1 The basic execution loop
 
-When `flow.run(shared)` is called, a single sequential loop drives everything by default:
+When `flow.run(shared)` is called, a single sequential loop drives everything by default. The developer initializes a shared dictionary, creates nodes connected by actions, and calls `run()`:
+
+```python
+shared = {"query": "What is PocketFlow?"}
+node_a >> "continue" >> node_b
+flow = Flow(start=node_a)
+flow.run(shared)
+```
+
+Internally, the runtime follows these steps:
 
 1. Start at the entry node.
-2. Execute the current graph element. For a `Node`, this means `prep()` reads from `shared`, `exec()` performs the work, and `post()` writes to `shared` and returns an Action.
-3. The Flow uses that Action to look up the next successor.
-4. Repeat until no matching transition exists.
+2. Execute the current graph element. For a `Node`, this means `prep()` reads from `shared`, `exec()` performs the work, and `post()` writes results back and returns an Action.
+3. The Flow uses that Action to look up the next successor via the graph's transition table.
+4. Repeat until no matching transition exists (i.e., the node returns a terminal action with no outgoing edge).
 
-This is a **single-threaded, synchronous walk** of the graph by default. State is carried through the Shared Store, so the process is easy to reason about: at any moment there is one current graph element and one shared dictionary.
+This is a **single-threaded, synchronous walk** of the graph. State is carried through the Shared Store, so the process is easy to reason about: at any moment there is one current graph element and one shared dictionary.
 
 ![Diagram 9](diagrams/diagram_9.png)
 
@@ -454,7 +463,20 @@ This is a **single-threaded, synchronous walk** of the graph by default. State i
 
 ### 9.2 Failure handling at runtime
 
-Failure handling is localized to `Node._exec()`. If `exec()` raises, the node retries up to `max_retries`, optionally waiting `wait` seconds between attempts. If all retries fail, `exec_fallback()` is called. By default, `exec_fallback()` re-raises the exception; developers can override it to return a graceful fallback result. Because `exec()` receives only `prep_res` rather than the Shared Store itself, retried calls are less likely to leave shared state half-written.
+Failure handling is localized to `Node._exec()`. If `exec()` raises, the node retries up to `max_retries`, optionally waiting `wait` seconds between attempts. If all retries fail, `exec_fallback()` is called:
+
+```python
+class SummarizeNode(Node):
+    def exec(self, prep_res):
+        return call_llm(prep_res)  # may raise on network error
+
+    def exec_fallback(self, prep_res, exc):
+        return "Summary unavailable due to API error."
+
+summarize = SummarizeNode(max_retries=3, wait=2)
+```
+
+By default, `exec_fallback()` re-raises the exception; developers can override it to return a graceful fallback result. Because `exec()` receives only `prep_res` (not the Shared Store itself), retried calls are less likely to leave shared state half-written.
 
 <img src="diagrams/diagram_10.png" alt="Diagram 10" width="500">
 
@@ -465,11 +487,44 @@ Failure handling is localized to `Node._exec()`. If `exec()` raises, the node re
 
 ### 9.3 Branching, looping, and agents
 
-Because routing is just a returned string, runtime behavior can branch (different actions → different nodes) and loop (an action pointing back to an earlier node). This is exactly the mechanism that turns a static graph into a dynamic **agent**: a node calls the LLM to decide what to do next, returns that decision as an action, and the flow loops until a terminal action is reached.
+Because routing is just a returned string, runtime behavior can branch and loop. This three-node example shows both:
+
+```python
+class DecideNode(Node):
+    def post(self, shared, prep_res, exec_res):
+        word = shared["query"].split()[0]
+        return "long" if len(word) > 6 else "short"
+
+class ShortWordNode(Node):
+    def post(self, shared, prep_res, exec_res):
+        return "done"
+
+class LongWordNode(Node):
+    def post(self, shared, prep_res, exec_res):
+        shared["query"] = shared["query"][1:]  # trim first char
+        return "retry" if len(shared["query"]) > 6 else "done"
+
+decide >> "long"  >> long_word
+decide >> "short" >> short_word
+long_word >> "retry" >> decide   # loop back
+long_word >> "done"              # terminal
+```
+
+At runtime, `decide` inspects the query and **branches** to either the short-word or long-word path. The long-word path trims the first character and **loops** back to `decide` via the `"retry"` action until the query is short enough. This branching-and-looping mechanism is exactly what turns a static graph into a dynamic **agent**: a node calls the LLM to decide what to do next, returns that decision as an action, and the flow loops until a terminal action is reached.
 
 ### 9.4 Concurrency and asynchrony (advanced)
 
-The default model is synchronous, but PocketFlow also provides **Async**, **Batch**, and **Async Parallel Batch** variants of nodes and flows. Async nodes and flows let I/O-bound work (like slow LLM or API calls) be awaited without blocking the event loop. Batch variants process multiple items, and async parallel batch variants use concurrent async execution for independent items. Notably, several language ports launched as synchronous-only or with smaller feature sets, which makes asynchrony a real complexity frontier for the project.
+The default model is synchronous, but PocketFlow also provides **Async**, **Batch**, and **Async Parallel Batch** variants of nodes and flows. Which variant to use depends on the workload:
+
+| Variant | Best for | Behavior |
+|---|---|---|
+| **Batch** | Multiple independent items (e.g., process N documents) | Runs `exec()` once per item sequentially in a single node |
+| **Async** | I/O-bound calls (LLM, API) in async applications | Awaits each `exec()` call without blocking the event loop |
+| **Async Parallel Batch** | Many independent I/O-bound items | Awaits all item-level `exec()` calls concurrently |
+
+Async variants let I/O-bound work (slow LLM or API calls) be awaited without blocking the event loop. Batch variants process multiple items within a single node, and async parallel batch variants use concurrent async execution for independent items. For example, when classifying 100 documents via an LLM, `AsyncParallelBatchNode` fires all API calls concurrently rather than one at a time.
+
+Several language ports launched as synchronous-only or with smaller feature sets, which makes asynchrony a real complexity frontier for the project.
 
 ---
 
