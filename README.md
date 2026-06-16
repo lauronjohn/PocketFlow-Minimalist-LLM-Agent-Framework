@@ -1367,6 +1367,7 @@ Ranking these by how likely they are to bite versus how much they hurt:
 | Week 6 — Midterm | [x] Quality Attribute Scenarios |
 | Week 7 | [x] Technical Debt Analysis |
 | Week 8 — Final | [x] Logical View<br/> [x] Deployment View<br/> [x] Architecture Tactics<br/> [x] Decision Relationship Graph<br/> [x] Conclusion |
+| Week 9 — Post-Final | [x] Enhanced Process View with code examples and concurrency table<br/> [x] LLM Application Pattern code snippets (Workflow, Agent, RAG, Map-Reduce, Structured Output, Multi-Agent)<br/> [x] Mermaid diagrams for Workflow, Structured Output, and Multi-Agent patterns (Figures 35–37)<br/> [x] Section 12.3 Usage Cookbook with 4 complete runnable examples<br/> [x] Figure 13 added (Project structure), all figures renumbered<br/> [x] Table of figures updated throughout |
 
 <a id="figure-34"></a>
 *Figure 34: Revision summary and weekly progress log — eight weeks of architecture recovery work.*
