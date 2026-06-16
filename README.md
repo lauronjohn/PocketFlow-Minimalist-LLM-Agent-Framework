@@ -147,9 +147,6 @@ A second pillar of the project is **Agentic Coding**: the framework is intention
 
 This report recovers PocketFlow's architecture using a structured, multi-view approach (inspired by the "4+1" and DESOSA models). The goal is to explain not just *what* the framework does, but *why* it is built the way it is.
 
-> **Community Engagement:** We reached out to the PocketFlow maintainers (Zachary Huang and the core team) via GitHub Discussions to better understand the architectural rationale behind several design decisions. At the time of writing, we had not received a direct reply. However, the project's extensive documentation, cookbook examples, and open GitHub issue discussions provided substantial insight into the decision-making process and the philosophy behind the framework's deliberate minimalism.
-
-
 <a id="2-architecture-views-and-viewpoints-selected"></a>
 
 ## 2. Architecture Views and Viewpoints Selected
