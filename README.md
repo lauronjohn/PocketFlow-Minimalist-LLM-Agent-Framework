@@ -16,6 +16,7 @@
 1. [Introduction](#1-introduction)
 2. [Architecture Views and Viewpoints Selected](#2-architecture-views-and-viewpoints-selected)
 3. [Stakeholder Analysis and Concerns](#3-stakeholder-analysis-and-concerns)
+    1. [Decision-Making Analysis from Pull Requests](#31-decision-making-analysis-from-pull-requests)
 4. [Key Architecture Drivers](#4-key-architecture-drivers)
 5. [Architecture-Significant Use Cases](#5-architecture-significant-use-cases)
 6. [Context View](#6-context-view)
@@ -146,6 +147,8 @@ A second pillar of the project is **Agentic Coding**: the framework is intention
 
 This report recovers PocketFlow's architecture using a structured, multi-view approach (inspired by the "4+1" and DESOSA models). The goal is to explain not just *what* the framework does, but *why* it is built the way it is.
 
+> **Community Engagement:** We reached out to the PocketFlow maintainers (Zachary Huang and the core team) via GitHub Discussions to better understand the architectural rationale behind several design decisions. At the time of writing, we had not received a direct reply. However, the project's extensive documentation, cookbook examples, and open GitHub issue discussions provided substantial insight into the decision-making process and the philosophy behind the framework's deliberate minimalism.
+
 
 <a id="2-architecture-views-and-viewpoints-selected"></a>
 
@@ -205,6 +208,35 @@ Placing these stakeholders by how much influence they have over the design versu
 
 <a id="figure-5"></a>
 *Figure 5: Stakeholder map showing influence versus interest for each stakeholder group.*
+
+<a id="31-decision-making-analysis-from-pull-requests"></a>
+
+### 3.1 Decision-Making Analysis from Pull Requests
+
+To understand how architectural decisions are actually made in the PocketFlow project, we analyzed a sample of merged, rejected, and still-open pull requests (PRs) from the upstream repository ([The-Pocket/PocketFlow](https://github.com/The-Pocket/PocketFlow)). The analysis reveals clear patterns in how the maintainers protect the architectural vision.
+
+| PR | Title | Status | Lines Changed | Key Insight |
+|---|---:|---:|---|
+| [#133](https://github.com/The-Pocket/PocketFlow/pull/133) | Expand framework comparison table | Merged | — | Documentation improvements are welcomed and merged quickly |
+| [#121](https://github.com/The-Pocket/PocketFlow/pull/121) | Fixed cookbook agent issues | Merged | +41 / −10 | Cookbook bugfixes accepted with minimal review friction |
+| [#109](https://github.com/The-Pocket/PocketFlow/pull/109) | FIX: RecursionError when loop flow | Merged | +160 / −6 | Core engine bugfixes are reviewed and merged — correctness is non-negotiable |
+| [#101](https://github.com/The-Pocket/PocketFlow/pull/101) | Fix AsyncNode retry mechanism | Merged | +2 / −2 | Even 2-line fixes to the core engine get careful review |
+| [#86](https://github.com/The-Pocket/PocketFlow/pull/86) | Adding type hints to `__init__.py` | Merged | +97 / −0 | Type hints accepted when they add zero logic changes — readability matters |
+| [#88](https://github.com/The-Pocket/PocketFlow/pull/88) | Resume mechanism for stateful workflow recovery | **Not merged** | +298 / −25 | A well-documented feature with 8 changed files was rejected — it adds 298 lines to the core, violating the ~100-line minimalism promise |
+| [#92](https://github.com/The-Pocket/PocketFlow/pull/92) | Added type hints and docstrings (811 lines) | **Open** (titled "Don't Merge!") | +811 | The PR author *themselves* labeled it "Don't Merge" — acknowledging that 811 lines of docstrings contradict the framework's one-file philosophy even if they improve readability |
+| [#120](https://github.com/The-Pocket/PocketFlow/pull/120) | Add pocketflow_rag subpackage | **Open** ([WIP]) | — | A proposed RAG subpackage remains unmerged — pushing features into subpackages rather than the cookbook is architecturally contentious |
+
+**Emerging patterns:**
+
+1. **The ~100-line core is non-negotiable.** PRs that expand `pocketflow/__init__.py` beyond its current size are consistently rejected or left open, regardless of how well-implemented or documented they are. This confirms that minimalism is not just a design goal — it is actively enforced through the review process.
+
+2. **Bugfixes are fast-tracked.** Core engine correctness issues (recursion errors, async retry bugs) are reviewed and merged with minimal friction. The project distinguishes sharply between *fixing what exists* and *adding what doesn't exist*.
+
+3. **Features live in the cookbook, not the core.** Cookbook and documentation additions face a much lower barrier than core changes. This is a deliberate architectural strategy: the framework stays small, and application-specific complexity is demonstrated through examples rather than shipped as framework code.
+
+4. **The community internalizes the philosophy.** Contributors who propose large core changes sometimes self-police (e.g., PR #92's "Don't Merge!" title), showing that the minimalism constraint is well-understood by the community.
+
+5. **Architecture discussions happen in the open.** Even rejected PRs contain substantive discussion about architectural trade-offs — for example, PR #88's resume mechanism prompted a detailed conversation about whether statefulness belongs in the core or in user code.
 
 <a id="4-key-architecture-drivers"></a>
 
