@@ -39,7 +39,8 @@
     3. [Decision Trade-Off Summary](#113-decision-trade-off-summary)
 12. [Architecture Patterns and LLM Application Patterns](#12-architecture-patterns-and-llm-application-patterns)
     1. [Architecture Patterns Used](#121-architecture-patterns-used)
-    2. [LLM Application Patterns Expressed by PocketFlow](#122-llm-application-patterns-expressed-by-pocketflow)
+     2. [LLM Application Patterns Expressed by PocketFlow](#122-llm-application-patterns-expressed-by-pocketflow)
+     3. [Usage Cookbook](#123-usage-cookbook)
 13. [Quality Attribute Scenarios & Tactics](#13-quality-attribute-scenarios-and-tactics)
     1. [Quality Attribute Tactics Summary](#131-quality-attribute-tactics-summary)
 14. [Technical Debt Analysis](#14-technical-debt-analysis)
@@ -907,11 +908,47 @@ A Workflow is represented as a chain or graph of Nodes. Each Node performs one s
 
 This is one of the most natural uses of PocketFlow because the graph model directly supports sequential and branching workflows.
 
+```python
+class FetchNode(Node):
+    def exec(self, prep_res):       return call_api(prep_res)
+    def post(self, shared, p, e):   shared["data"] = e; return "default"
+
+class ProcessNode(Node):
+    def exec(self, prep_res):       return transform(prep_res)
+    def post(self, shared, p, e):   shared["result"] = e; return "default"
+
+fetch = FetchNode()
+process = ProcessNode()
+fetch >> process
+flow = Flow(start=fetch)
+flow.run(shared)
+```
+
 ### Agent
 
 An Agent is represented as a Flow with branching and looping behavior. A Node can call an LLM, decide what should happen next, and return an Action string such as `"search"`, `"retry"`, `"answer"`, or `"finish"`.
 
 The Flow then follows the corresponding transition. This means agent behavior emerges from ordinary graph execution rather than from a separate Agent class.
+
+```python
+class ThinkNode(Node):
+    def exec(self, prep_res):       return call_llm(prep_res)
+    def post(self, shared, p, e):
+        shared["thought"] = e
+        return parse_action(e)      # "search", "answer", or "finish"
+
+class SearchNode(Node):
+    def exec(self, prep_res):       return web_search(prep_res)
+    def post(self, shared, p, e):   shared["results"] = e; return "default"
+
+class AnswerNode(Node):
+    def exec(self, prep_res):       return format_response(prep_res)
+    def post(self, shared, p, e):   shared["answer"] = e; return "default"
+
+think - "search" >> search_node
+think - "answer" >> answer_node
+search_node >> think                 # loop back for more thinking
+```
 
 ![Diagram 17](diagrams/diagram_17.png)
 
@@ -922,7 +959,24 @@ The Flow then follows the corresponding transition. This means agent behavior em
 
 RAG can be represented as a combination of retrieval and generation Nodes. One part of the Flow retrieves relevant information, while another Node uses that information to generate an answer.
 
-PocketFlow does not need a special RAG framework class. The RAG pattern is expressed as a graph of retrieval, embedding, search, and generation steps.
+```python
+class RetrieveNode(Node):
+    def exec(self, prep_res):       return search_index(prep_res)
+    def post(self, shared, p, e):   shared["context"] = e; return "default"
+
+class GenerateNode(Node):
+    def prep(self, shared):         return (shared["query"], shared["context"])
+    def exec(self, prep_res):       return generate_response(prep_res)
+    def post(self, shared, p, e):   shared["answer"] = e; return "default"
+
+retrieve = RetrieveNode()
+generate = GenerateNode()
+retrieve >> generate
+flow = Flow(start=retrieve)
+flow.run({"query": "What is PocketFlow?"})
+```
+
+PocketFlow does not need a special RAG framework class. The RAG pattern is expressed as a graph of retrieval and generation steps.
 
 ![Diagram 18](diagrams/diagram_18.png)
 
@@ -933,7 +987,23 @@ PocketFlow does not need a special RAG framework class. The RAG pattern is expre
 
 Map-Reduce can be expressed using batch processing and aggregation. The map phase processes many items independently, while the reduce phase combines the results.
 
-This pattern fits PocketFlow’s Batch and Parallel execution variants, especially for document processing, summarization, or multi-item LLM workloads.
+```python
+class MapNode(BatchNode):
+    def exec(self, item):           return summarize(item)
+
+class ReduceNode(Node):
+    def prep(self, shared):         return shared["map_results"]
+    def exec(self, prep_res):       return merge_summaries(prep_res)
+    def post(self, shared, p, e):   shared["final_summary"] = e; return "default"
+
+map_node = MapNode()
+reduce_node = ReduceNode()
+map_node >> reduce_node
+flow = Flow(start=map_node)
+flow.run({"documents": [doc1, doc2, doc3]})
+```
+
+This pattern fits PocketFlow's Batch and Parallel execution variants, especially for document processing, summarization, or multi-item LLM workloads.
 
 ![Diagram 19](diagrams/diagram_19.png)
 
@@ -944,13 +1014,212 @@ This pattern fits PocketFlow’s Batch and Parallel execution variants, especial
 
 Structured Output is implemented inside a Node. The Node prompts the LLM to return a fixed format or parses the LLM response into a defined structure.
 
+```python
+class ExtractNode(Node):
+    def exec(self, prep_res):       return call_llm(prep_res, format="json")
+    def post(self, shared, p, e):   shared["structured"] = json.loads(e); return "default"
+```
+
 This is an application-level pattern rather than a separate framework-level architecture pattern.
 
 ### Multi-Agent
 
 Multi-Agent systems can be represented as multiple agent-like Nodes or nested Flows. Each agent can make decisions, return Actions, and communicate through the Shared Store or through explicitly designed message structures.
 
+```python
+class AgentA(Node):
+    def prep(self, shared):         return shared.get("inbox", "")
+    def exec(self, prep_res):       return decide_action(prep_res)
+    def post(self, shared, p, e):
+        shared["outbox"] = e
+        return e.get("next", "done")
+
+class AgentB(Node):
+    def prep(self, shared):         return shared.get("outbox", "")
+    def exec(self, prep_res):       return respond(prep_res)
+    def post(self, shared, p, e):
+        shared["inbox"] = e
+        return "loop" if not is_terminal(e) else "done"
+
+agent_a - "done" >> agent_b
+agent_b - "loop" >> agent_a
+```
+
 This pattern is supported by the same underlying graph and Shared Store model.
+
+<a id="123-usage-cookbook"></a>
+
+### 12.3 Usage Cookbook
+
+The following examples show complete, runnable PocketFlow applications — demonstrating how the four primitives combine to build real LLM-powered systems.
+
+<details>
+<summary><strong>Example 1: Simple Chatbot</strong></summary>
+
+A minimal chatbot that takes a user query, calls an LLM, and returns the response:
+
+```python
+from pocketflow import Node, Flow
+
+class ChatNode(Node):
+    def prep(self, shared):
+        return shared["query"]
+
+    def exec(self, prep_res):
+        # Call your LLM of choice (OpenAI, Anthropic, local model, etc.)
+        return call_llm(prep_res)
+
+    def post(self, shared, prep_res, exec_res):
+        shared["response"] = exec_res
+        return "default"
+
+chat = ChatNode()
+flow = Flow(start=chat)
+shared = {"query": "Explain PocketFlow's graph model in one sentence."}
+flow.run(shared)
+print(shared["response"])
+```
+
+</details>
+
+<details>
+<summary><strong>Example 2: RAG Pipeline</strong></summary>
+
+A retrieval-augmented generation pipeline that searches documents before answering:
+
+```python
+from pocketflow import Node, Flow
+
+class RetrieveNode(Node):
+    def prep(self, shared):
+        return shared["query"]
+
+    def exec(self, prep_res):
+        # Search your vector DB, keyword index, or document store
+        return search_documents(prep_res, top_k=3)
+
+    def post(self, shared, prep_res, exec_res):
+        shared["context"] = exec_res
+        return "default"
+
+class GenerateNode(Node):
+    def prep(self, shared):
+        # Combine the query with retrieved context
+        prompt = f"Query: {shared['query']}\nContext: {shared['context']}\nAnswer:"
+        return prompt
+
+    def exec(self, prep_res):
+        return call_llm(prep_res)
+
+    def post(self, shared, prep_res, exec_res):
+        shared["answer"] = exec_res
+        return "default"
+
+retrieve = RetrieveNode()
+generate = GenerateNode()
+retrieve >> generate
+flow = Flow(start=retrieve)
+shared = {"query": "How does PocketFlow handle retries?"}
+flow.run(shared)
+print(shared["answer"])
+```
+
+</details>
+
+<details>
+<summary><strong>Example 3: Multi-Agent System</strong></summary>
+
+Two agents cooperate through the Shared Store — a Researcher agent gathers information and a Writer agent synthesizes it:
+
+```python
+from pocketflow import Node, Flow
+
+class Researcher(Node):
+    def prep(self, shared):
+        return shared.get("topic", "")
+
+    def exec(self, prep_res):
+        return web_search(prep_res)
+
+    def post(self, shared, prep_res, exec_res):
+        shared["research_notes"] = exec_res
+        return "default"
+
+class Writer(Node):
+    def prep(self, shared):
+        # Read what the Researcher left in the Shared Store
+        return (shared["topic"], shared["research_notes"])
+
+    def exec(self, prep_res):
+        topic, notes = prep_res
+        prompt = f"Topic: {topic}\nNotes: {notes}\nWrite a report:"
+        return call_llm(prompt)
+
+    def post(self, shared, prep_res, exec_res):
+        shared["report"] = exec_res
+        return "default"
+
+researcher = Researcher()
+writer = Writer()
+researcher >> writer
+flow = Flow(start=researcher)
+shared = {"topic": "PocketFlow architecture patterns"}
+flow.run(shared)
+print(shared["report"])
+```
+
+</details>
+
+<details>
+<summary><strong>Example 4: Tool-Using Agent</strong></summary>
+
+An agent that can choose between searching the web, running a calculation, or answering directly:
+
+```python
+from pocketflow import Node, Flow
+
+class DecideNode(Node):
+    def prep(self, shared):
+        return shared["query"]
+
+    def exec(self, prep_res):
+        prompt = f"Query: {prep_res}\nRespond with: SEARCH, CALC, or ANSWER"
+        return call_llm(prompt)
+
+    def post(self, shared, prep_res, exec_res):
+        shared["decision"] = exec_res.strip()
+        return exec_res.strip()   # "SEARCH", "CALC", or "ANSWER"
+
+class SearchNode(Node):
+    def exec(self, prep_res):       return web_search(prep_res)
+    def post(self, shared, p, e):   shared["result"] = e; return "decide"
+
+class CalcNode(Node):
+    def exec(self, prep_res):       return eval_expression(prep_res)
+    def post(self, shared, p, e):   shared["result"] = e; return "decide"
+
+class AnswerNode(Node):
+    def exec(self, prep_res):       return call_llm(prep_res)
+    def post(self, shared, p, e):   shared["answer"] = e; return "default"
+
+decide = DecideNode()
+search = SearchNode()
+calc = CalcNode()
+answer = AnswerNode()
+
+decide - "SEARCH" >> search
+decide - "CALC"   >> calc
+decide - "ANSWER" >> answer
+search >> decide     # loop back to decide next action
+calc   >> decide
+
+flow = Flow(start=decide)
+shared = {"query": "What is the square root of 144 plus the population of Tokyo?"}
+flow.run(shared)
+print(shared.get("answer") or shared.get("result"))
+```
+
+</details>
 
 ---
 
